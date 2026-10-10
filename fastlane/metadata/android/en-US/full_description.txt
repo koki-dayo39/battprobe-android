@@ -1,0 +1,12 @@
+Battery Status shows what your battery and charger are really doing, refreshed every second.
+
+Without any special permission it reads the Android BatteryManager: level, charging state, current, voltage, power in watts, temperature and time to full.
+
+Grant it Shizuku access (wireless debugging or root) and it also reads dumpsys battery and every /sys/class/power_supply node as the shell user:
+
+• Negotiated charger current/voltage/power, USB type (SDP/DCP/PD), Type-C PD capabilities, charge phase
+• Design capacity vs. learned full capacity, capacity health %, cycle count
+• Vendor health index, internal resistance, manufacturing date (where the driver exposes them)
+• Raw dumpsys, uevent and sysfs dumps, plus a list of sysfs nodes the app does not yet understand
+
+A diagnostics report (device info, raw data, in-app log) can be shared or saved from the settings sheet to help improve support for your device. No network access, no analytics.

@@ -12,6 +12,8 @@ Shizuku 権限を使って、Android の充電速度やバッテリーの詳細�
 | 健康状態 | 温度、ヘルス、サイクル数、設計容量、満充電容量 (学習値)、`batterystats` の推定容量、容量の健全度 % | ほぼ必要 |
 | 詳細 | BatteryManager の生の値、`dumpsys battery` 全項目、`/sys/class/power_supply/*` の全ファイル、`batterystats` 抜粋 | 必要 |
 | Raw | 上記の生テキスト (コピー可) | 必要 |
+| 未知の sysfs | アプリが解釈していない power_supply 項目の件数と一覧 (コピーして報告できる) | 必要 |
+| 診断 | 設定 → 診断から、端末情報・生データ・アプリ内ログをまとめたレポートを共有 / ファイル保存 / コピー | 不要 |
 
 Shizuku なしでも BatteryManager から取れる範囲 (電流・電圧・W 数など) は表示される。
 
@@ -40,6 +42,12 @@ GitHub Actions (`.github/workflows/build.yml`) が push ごとに両方の APK �
 1. Shizuku を起動 (ワイヤレスデバッグ or root)
 2. このアプリを開き、Shizuku カードの「許可する」を押す
 3. シェルサービスが接続されると充電器・健康状態・Raw が埋まる
+
+## F-Droid / 配布
+
+- `fastlane/metadata/android/` に en-US / ja-JP の説明文を置いてある
+- ネットワーク権限なし、解析ツールなし。依存は AndroidX / Compose / Shizuku API (Apache-2.0) のみ
+- 公開前に LICENSE ファイルを追加すること (F-Droid は FOSS ライセンス必須)
 
 ## 構成
 

@@ -8,7 +8,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -24,11 +28,19 @@ import com.kokidayo.batterystatus.data.CurrentUnit
 import com.kokidayo.batterystatus.data.Settings
 import com.kokidayo.batterystatus.data.SignMode
 
+class DiagnosticsActions(
+    val share: () -> Unit,
+    val save: () -> Unit,
+    val copy: () -> Unit,
+    val clearLog: () -> Unit,
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsSheet(
     settings: Settings,
     onChange: (Settings) -> Unit,
+    diagnostics: DiagnosticsActions,
     onDismiss: () -> Unit,
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
@@ -82,6 +94,22 @@ fun SettingsSheet(
                 RadioRow(stringResource(R.string.sign_inverted), settings.signMode == SignMode.INVERTED) {
                     onChange(settings.copy(signMode = SignMode.INVERTED))
                 }
+            }
+            HorizontalDivider()
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.settings_diagnostics), style = MaterialTheme.typography.titleSmall)
+                Text(
+                    stringResource(R.string.settings_diagnostics_desc),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = diagnostics.share) { Text(stringResource(R.string.action_share_diagnostics)) }
+                    OutlinedButton(onClick = diagnostics.save) { Text(stringResource(R.string.action_save_diagnostics)) }
+                    OutlinedButton(onClick = diagnostics.copy) { Text(stringResource(R.string.action_copy_diagnostics)) }
+                }
+                TextButton(onClick = diagnostics.clearLog) { Text(stringResource(R.string.action_clear_log)) }
             }
             Spacer(Modifier.height(8.dp))
         }

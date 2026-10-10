@@ -5,7 +5,7 @@ import android.content.Context
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.os.IBinder
-import android.util.Log
+import com.kokidayo.batterystatus.util.AppLog
 import com.kokidayo.batterystatus.BuildConfig
 import com.kokidayo.batterystatus.IShellService
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -55,16 +55,16 @@ object ShizukuManager {
             binding = false
             if (binder != null && binder.pingBinder()) {
                 _service.value = IShellService.Stub.asInterface(binder)
-                Log.i(TAG, "Shell service connected")
+                AppLog.i(TAG, "Shell service connected")
             } else {
-                Log.w(TAG, "Shell service binder invalid")
+                AppLog.w(TAG, "Shell service binder invalid")
             }
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
             binding = false
             _service.value = null
-            Log.i(TAG, "Shell service disconnected")
+            AppLog.i(TAG, "Shell service disconnected")
         }
     }
 
@@ -99,6 +99,7 @@ object ShizukuManager {
     fun refresh() {
         if (!initialized) return
         val newState = computeState()
+        if (newState != _state.value) AppLog.i(TAG, "state ${_state.value} -> $newState (shizuku v${runCatching { Shizuku.getVersion() }.getOrDefault(-1)})")
         _state.value = newState
         if (newState == ShizukuState.READY) {
             bindService()
@@ -119,7 +120,7 @@ object ShizukuManager {
                 else -> ShizukuState.PERMISSION_REQUIRED
             }
         } catch (e: Exception) {
-            Log.w(TAG, "checkSelfPermission failed", e)
+            AppLog.w(TAG, "checkSelfPermission failed", e)
             ShizukuState.NOT_RUNNING
         }
     }
@@ -129,7 +130,7 @@ object ShizukuManager {
         try {
             Shizuku.requestPermission(REQUEST_CODE)
         } catch (e: Exception) {
-            Log.w(TAG, "requestPermission failed", e)
+            AppLog.w(TAG, "requestPermission failed", e)
         }
     }
 
@@ -140,7 +141,7 @@ object ShizukuManager {
             Shizuku.bindUserService(userServiceArgs, connection)
         } catch (e: Exception) {
             binding = false
-            Log.w(TAG, "bindUserService failed", e)
+            AppLog.w(TAG, "bindUserService failed", e)
         }
     }
 
@@ -148,7 +149,7 @@ object ShizukuManager {
         try {
             Shizuku.unbindUserService(userServiceArgs, connection, true)
         } catch (e: Exception) {
-            Log.w(TAG, "unbindUserService failed", e)
+            AppLog.w(TAG, "unbindUserService failed", e)
         }
         _service.value = null
         binding = false

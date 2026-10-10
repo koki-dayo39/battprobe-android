@@ -111,6 +111,20 @@
     <string name="sign_as_is">As reported</string>
     <string name="sign_inverted">Inverted</string>
 
+    <string name="card_unknown_sysfs">Unknown sysfs nodes: %1$d</string>
+    <string name="unknown_sysfs_desc">These power_supply nodes are not interpreted by the app yet. Copy them into a bug report so support for your device can be added.</string>
+    <string name="action_show">Show</string>
+    <string name="action_hide">Hide</string>
+    <string name="action_copy">Copy</string>
+    <string name="copied">Copied</string>
+    <string name="settings_diagnostics">Diagnostics</string>
+    <string name="settings_diagnostics_desc">Device info, raw battery data and the in-app log as a text report. Nothing is sent anywhere unless you share it.</string>
+    <string name="action_share_diagnostics">Share</string>
+    <string name="action_save_diagnostics">Save as file</string>
+    <string name="action_copy_diagnostics">Copy</string>
+    <string name="diagnostics_saved">Diagnostics saved</string>
+    <string name="diagnostics_failed">Could not export diagnostics: %1$s</string>
+    <string name="action_clear_log">Clear log</string>
     <string name="value_na">—</string>
     <string name="footer_updated">Updated %1$s</string>
     <string name="waiting_for_data">Reading battery…</string>

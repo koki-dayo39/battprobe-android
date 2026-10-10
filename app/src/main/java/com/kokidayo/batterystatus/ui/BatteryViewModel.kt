@@ -18,6 +18,8 @@ import com.kokidayo.batterystatus.data.leadingNumber
 import com.kokidayo.batterystatus.data.voltageToV
 import com.kokidayo.batterystatus.shizuku.ShizukuManager
 import com.kokidayo.batterystatus.shizuku.ShizukuState
+import com.kokidayo.batterystatus.diag.DiagnosticsReport
+import com.kokidayo.batterystatus.util.AppLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -65,6 +67,9 @@ class BatteryViewModel(app: Application) : AndroidViewModel(app) {
 
     fun refreshShizuku() = ShizukuManager.refresh()
 
+    fun buildDiagnostics(): String =
+        DiagnosticsReport.build(getApplication(), uiState.value, settings.value)
+
     private val ticker = channelFlow {
         val shellData = MutableStateFlow<ShellData?>(null)
         val shellError = MutableStateFlow<String?>(null)
@@ -92,7 +97,16 @@ class BatteryViewModel(app: Application) : AndroidViewModel(app) {
                 try {
                     val wantFull = started - lastFullAt > FULL_SYSFS_INTERVAL_MS
                     val data = repository.readShell(service, shellData.value, wantFull, SHELL_TIMEOUT_MS)
-                    if (wantFull && data.sysfsFullAt > 0) lastFullAt = started
+                    val took = SystemClock.elapsedRealtime() - started
+                    if (wantFull && data.sysfsFullAt > 0) {
+                        lastFullAt = started
+                        AppLog.i(TAG, "shell read with full sysfs scan: ${took} ms, " +
+                            "${data.sysfsFull.values.sumOf { it.size }} nodes in ${data.sysfsFull.size} supplies")
+                    } else if (shellData.value == null) {
+                        AppLog.i(TAG, "first shell read: ${took} ms, ${data.powerSupplies.size} supplies via uevent")
+                    } else if (took > SHELL_TIMEOUT_MS / 2) {
+                        AppLog.w(TAG, "slow shell read: ${took} ms")
+                    }
                     val merged = stats?.let { data.copy(batteryStats = it.first, batteryStatsRaw = it.second) } ?: data
                     shellData.value = merged
                     shellError.value = null
@@ -102,8 +116,11 @@ class BatteryViewModel(app: Application) : AndroidViewModel(app) {
                     if (statsJob?.isActive != true && started - lastStatsAt > STATS_INTERVAL_MS) {
                         lastStatsAt = started
                         statsJob = launch {
+                            val t0 = SystemClock.elapsedRealtime()
                             runCatching { repository.readBatteryStats(service, STATS_TIMEOUT_MS) }
+                                .onFailure { AppLog.w(TAG, "batterystats failed", it) }
                                 .onSuccess { result ->
+                                    AppLog.i(TAG, "batterystats: ${SystemClock.elapsedRealtime() - t0} ms, ${result.first.size} keys")
                                     if (result.second.isNotBlank()) {
                                         stats = result
                                         shellData.value = shellData.value
@@ -113,7 +130,9 @@ class BatteryViewModel(app: Application) : AndroidViewModel(app) {
                         }
                     }
                 } catch (e: Exception) {
-                    shellError.value = e.message ?: e.javaClass.simpleName
+                    val message = e.message ?: e.javaClass.simpleName
+                    if (shellError.value != message) AppLog.w(TAG, "shell read failed", e)
+                    shellError.value = message
                 }
                 val elapsed = SystemClock.elapsedRealtime() - started
                 delay((settings.value.intervalMs - elapsed).coerceAtLeast(MIN_SHELL_GAP_MS))
@@ -133,6 +152,8 @@ class BatteryViewModel(app: Application) : AndroidViewModel(app) {
             if (deviceMa != null) {
                 val learned = polarityLearner.update(local, deviceMa, SystemClock.elapsedRealtime())
                 if (learned != null && learned != polarity) {
+                    AppLog.i(TAG, "current polarity learned: $polarity -> $learned " +
+                        "(plugged=${local.plugged}, status=${local.status}, reported=${deviceMa} mA)")
                     polarity = learned
                     settingsStore.learnedPolarity = learned
                 }
@@ -250,6 +271,7 @@ class BatteryViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private companion object {
+        const val TAG = "BatteryViewModel"
         const val STATS_INTERVAL_MS = 60_000L
         const val FULL_SYSFS_INTERVAL_MS = 15_000L
         const val MIN_SHELL_GAP_MS = 200L
