@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Battery Status</string>
+
+    <string name="tab_overview">概要</string>
+    <string name="tab_details">詳細</string>
+    <string name="tab_raw">Raw</string>
+
+    <string name="shizuku_title">Shizuku</string>
+    <string name="shizuku_not_installed">Shizuku が入ってない</string>
+    <string name="shizuku_not_installed_desc">Shizuku を入れると充電器の情報・sysfs の値・バッテリー劣化度が見れるようになるよ。</string>
+    <string name="shizuku_not_running">Shizuku が起動してない</string>
+    <string name="shizuku_not_running_desc">ワイヤレスデバッグか root で Shizuku を起動してから戻ってきてね。</string>
+    <string name="shizuku_permission_required">Shizuku の許可が必要</string>
+    <string name="shizuku_permission_required_desc">このアプリに Shizuku へのアクセスを許可すると、特権が必要なバッテリー情報を読めるよ。</string>
+    <string name="shizuku_permission_denied">Shizuku の許可が拒否された</string>
+    <string name="shizuku_permission_denied_desc">Shizuku アプリ側でこのアプリを許可してから再試行してね。</string>
+    <string name="shizuku_unsupported">Shizuku のバージョンが古い</string>
+    <string name="shizuku_unsupported_desc">Shizuku 11 以上が必要だよ。</string>
+    <string name="shizuku_connecting">シェルサービスに接続中…</string>
+    <string name="shizuku_ready">シェルサービス接続済み (uid %1$d)</string>
+    <string name="shizuku_ready_basic">シェルサービス接続済み</string>
+    <string name="action_request_permission">許可する</string>
+    <string name="action_open_shizuku">Shizuku を開く</string>
+    <string name="action_install_shizuku">Shizuku を入手</string>
+    <string name="action_retry">再試行</string>
+    <string name="shell_error">シェルエラー: %1$s</string>
+
+    <string name="status_charging">充電中</string>
+    <string name="status_discharging">放電中</string>
+    <string name="status_full">満充電</string>
+    <string name="status_not_charging">充電停止中</string>
+    <string name="status_unknown">不明</string>
+
+    <string name="plugged_ac">AC</string>
+    <string name="plugged_usb">USB</string>
+    <string name="plugged_wireless">ワイヤレス</string>
+    <string name="plugged_dock">ドック</string>
+    <string name="plugged_none">未接続</string>
+
+    <string name="health_good">良好</string>
+    <string name="health_overheat">過熱</string>
+    <string name="health_dead">寿命</string>
+    <string name="health_over_voltage">過電圧</string>
+    <string name="health_failure">異常</string>
+    <string name="health_cold">低温</string>
+    <string name="health_unknown">不明</string>
+
+    <string name="card_power">電力</string>
+    <string name="card_charger">充電器</string>
+    <string name="card_health">バッテリーの健康状態</string>
+    <string name="card_info">バッテリー情報</string>
+    <string name="card_history">電力の推移 (直近 %1$d 秒)</string>
+
+    <string name="label_current">電流</string>
+    <string name="label_voltage">電圧</string>
+    <string name="label_power">電力</string>
+    <string name="label_avg_current">平均電流</string>
+    <string name="label_temperature">温度</string>
+    <string name="label_health">状態</string>
+    <string name="label_cycle_count">サイクル数</string>
+    <string name="label_technology">種類</string>
+    <string name="label_charge_counter">充電量カウンタ</string>
+    <string name="label_energy_counter">エネルギーカウンタ</string>
+    <string name="label_time_to_full">満充電まで</string>
+    <string name="label_capacity_design">設計容量</string>
+    <string name="label_capacity_full">満充電容量 (学習値)</string>
+    <string name="label_capacity_estimated">推定容量 (batterystats)</string>
+    <string name="label_battery_health_pct">容量の健全度</string>
+    <string name="label_max_charging_current">最大充電電流</string>
+    <string name="label_max_charging_voltage">最大充電電圧</string>
+    <string name="label_max_charging_power">ネゴシエート最大電力</string>
+    <string name="label_charger_voltage">充電器電圧</string>
+    <string name="label_charger_current">充電器電流</string>
+    <string name="label_charger_power">充電器入力電力</string>
+    <string name="label_charger_type">充電器タイプ</string>
+    <string name="label_typec_mode">USB-C モード</string>
+    <string name="label_charge_type">充電フェーズ</string>
+    <string name="label_input_current_limit">入力電流上限</string>
+    <string name="label_source">電源</string>
+    <string name="label_present">バッテリー検出</string>
+    <string name="label_level_raw">残量 / スケール</string>
+    <string name="label_charging_status">充電ステータス (API 34)</string>
+    <string name="label_status">状態</string>
+
+    <string name="charging_into_battery">バッテリーへ</string>
+    <string name="discharging_from_battery">バッテリーから</string>
+    <string name="charger_needs_shizuku">充電器の詳細は Shizuku が必要だよ。</string>
+    <string name="health_needs_shizuku">容量やサイクル数はほとんどの端末で Shizuku が必要だよ。</string>
+
+    <string name="section_battery_manager">BatteryManager</string>
+    <string name="section_dumpsys_battery">dumpsys battery</string>
+    <string name="section_power_supply">/sys/class/power_supply/%1$s</string>
+    <string name="section_batterystats">dumpsys batterystats</string>
+    <string name="raw_empty">Raw 出力には Shizuku が必要。Shizuku を接続すると dumpsys と sysfs の生データがここに出るよ。</string>
+
+    <string name="settings_title">設定</string>
+    <string name="settings_interval">更新間隔</string>
+    <string name="settings_current_unit">端末が報告する電流の単位</string>
+    <string name="settings_current_unit_desc">Android の仕様は µA だけど mA で返す端末もある。値が1000倍ズレてたら切り替えてね。</string>
+    <string name="unit_micro">µA (標準)</string>
+    <string name="unit_milli">mA</string>
+    <string name="settings_sign">電流の符号</string>
+    <string name="settings_sign_desc">「自動」は端末の報告に関係なく、充電中をプラス・放電中をマイナスに揃えるよ。</string>
+    <string name="sign_auto">自動</string>
+    <string name="sign_as_is">そのまま</string>
+    <string name="sign_inverted">反転</string>
+
+    <string name="value_na">—</string>
+    <string name="footer_updated">更新: %1$s</string>
+    <string name="waiting_for_data">バッテリー情報を読み込み中…</string>
+</resources>

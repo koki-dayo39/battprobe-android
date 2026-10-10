@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Battery Status</string>
+
+    <string name="tab_overview">Overview</string>
+    <string name="tab_details">Details</string>
+    <string name="tab_raw">Raw</string>
+
+    <string name="shizuku_title">Shizuku</string>
+    <string name="shizuku_not_installed">Shizuku is not installed</string>
+    <string name="shizuku_not_installed_desc">Install Shizuku to unlock charger details, sysfs values and battery health.</string>
+    <string name="shizuku_not_running">Shizuku is not running</string>
+    <string name="shizuku_not_running_desc">Start Shizuku (via wireless debugging or root), then come back.</string>
+    <string name="shizuku_permission_required">Shizuku permission required</string>
+    <string name="shizuku_permission_required_desc">Grant this app access to Shizuku to read privileged battery stats.</string>
+    <string name="shizuku_permission_denied">Shizuku permission denied</string>
+    <string name="shizuku_permission_denied_desc">Allow this app in the Shizuku app, then retry.</string>
+    <string name="shizuku_unsupported">Shizuku version too old</string>
+    <string name="shizuku_unsupported_desc">Shizuku 11 or newer is required.</string>
+    <string name="shizuku_connecting">Connecting to shell service…</string>
+    <string name="shizuku_ready">Shell service connected (uid %1$d)</string>
+    <string name="shizuku_ready_basic">Shell service connected</string>
+    <string name="action_request_permission">Grant permission</string>
+    <string name="action_open_shizuku">Open Shizuku</string>
+    <string name="action_install_shizuku">Get Shizuku</string>
+    <string name="action_retry">Retry</string>
+    <string name="shell_error">Shell error: %1$s</string>
+
+    <string name="status_charging">Charging</string>
+    <string name="status_discharging">Discharging</string>
+    <string name="status_full">Full</string>
+    <string name="status_not_charging">Not charging</string>
+    <string name="status_unknown">Unknown</string>
+
+    <string name="plugged_ac">AC</string>
+    <string name="plugged_usb">USB</string>
+    <string name="plugged_wireless">Wireless</string>
+    <string name="plugged_dock">Dock</string>
+    <string name="plugged_none">Unplugged</string>
+
+    <string name="health_good">Good</string>
+    <string name="health_overheat">Overheat</string>
+    <string name="health_dead">Dead</string>
+    <string name="health_over_voltage">Over voltage</string>
+    <string name="health_failure">Failure</string>
+    <string name="health_cold">Cold</string>
+    <string name="health_unknown">Unknown</string>
+
+    <string name="card_power">Power</string>
+    <string name="card_charger">Charger</string>
+    <string name="card_health">Battery health</string>
+    <string name="card_info">Battery info</string>
+    <string name="card_history">Power history (last %1$d s)</string>
+
+    <string name="label_current">Current</string>
+    <string name="label_voltage">Voltage</string>
+    <string name="label_power">Power</string>
+    <string name="label_avg_current">Average current</string>
+    <string name="label_temperature">Temperature</string>
+    <string name="label_health">Health</string>
+    <string name="label_cycle_count">Cycle count</string>
+    <string name="label_technology">Technology</string>
+    <string name="label_charge_counter">Charge counter</string>
+    <string name="label_energy_counter">Energy counter</string>
+    <string name="label_time_to_full">Time to full</string>
+    <string name="label_capacity_design">Design capacity</string>
+    <string name="label_capacity_full">Full capacity (learned)</string>
+    <string name="label_capacity_estimated">Estimated capacity (batterystats)</string>
+    <string name="label_battery_health_pct">Capacity health</string>
+    <string name="label_max_charging_current">Max charging current</string>
+    <string name="label_max_charging_voltage">Max charging voltage</string>
+    <string name="label_max_charging_power">Max negotiated power</string>
+    <string name="label_charger_voltage">Charger voltage</string>
+    <string name="label_charger_current">Charger current</string>
+    <string name="label_charger_power">Charger input power</string>
+    <string name="label_charger_type">Charger type</string>
+    <string name="label_typec_mode">USB-C mode</string>
+    <string name="label_charge_type">Charge phase</string>
+    <string name="label_input_current_limit">Input current limit</string>
+    <string name="label_source">Source</string>
+    <string name="label_present">Battery present</string>
+    <string name="label_level_raw">Level / scale</string>
+    <string name="label_charging_status">Charging status (API 34)</string>
+    <string name="label_status">Status</string>
+
+    <string name="charging_into_battery">into battery</string>
+    <string name="discharging_from_battery">from battery</string>
+    <string name="charger_needs_shizuku">Charger details require Shizuku.</string>
+    <string name="health_needs_shizuku">Capacity and cycle data require Shizuku on most devices.</string>
+
+    <string name="section_battery_manager">BatteryManager</string>
+    <string name="section_dumpsys_battery">dumpsys battery</string>
+    <string name="section_power_supply">/sys/class/power_supply/%1$s</string>
+    <string name="section_batterystats">dumpsys batterystats</string>
+    <string name="raw_empty">Raw dumps need Shizuku. Connect Shizuku to see dumpsys and sysfs output here.</string>
+
+    <string name="settings_title">Settings</string>
+    <string name="settings_interval">Refresh interval</string>
+    <string name="settings_current_unit">Current unit reported by the device</string>
+    <string name="settings_current_unit_desc">Android reports µA, but some devices report mA. Change this if values look 1000× off.</string>
+    <string name="unit_micro">µA (standard)</string>
+    <string name="unit_milli">mA</string>
+    <string name="settings_sign">Current sign</string>
+    <string name="settings_sign_desc">Auto makes charging positive and discharging negative regardless of what the device reports.</string>
+    <string name="sign_auto">Auto</string>
+    <string name="sign_as_is">As reported</string>
+    <string name="sign_inverted">Inverted</string>
+
+    <string name="value_na">—</string>
+    <string name="footer_updated">Updated %1$s</string>
+    <string name="waiting_for_data">Reading battery…</string>
+</resources>
