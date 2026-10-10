@@ -488,10 +488,11 @@ private fun InfoCard(snapshot: BatterySnapshot) {
                 stringResource(R.string.label_charge_counter),
                 local.chargeCounterUah?.let { "${(it / 1000.0).fmt(0)} mAh" } ?: na,
             )
-            KeyValueRow(
-                stringResource(R.string.label_energy_counter),
-                local.energyCounterNwh?.takeIf { it != 0L }?.let { "${(it / 1_000_000.0).fmt(1)} mWh" } ?: na,
-            )
+            // ENERGY_COUNTER (nWh) is only implemented by devices whose fuel gauge
+            // reports energy (laptops, some tablets); phones return unsupported. Hide it then.
+            local.energyCounterNwh?.takeIf { it != 0L }?.let {
+                KeyValueRow(stringResource(R.string.label_energy_counter), "${(it / 1_000_000.0).fmt(1)} mWh")
+            }
             KeyValueRow(stringResource(R.string.label_present), local.present.toString())
             chargingStatusLabel(local.chargingStatus)?.let {
                 KeyValueRow(stringResource(R.string.label_charging_status), it)
