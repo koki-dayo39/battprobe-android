@@ -8,6 +8,7 @@ import android.os.Build
 import androidx.core.content.ContextCompat
 import com.kokidayo.batterystatus.IShellService
 import com.kokidayo.batterystatus.R
+import com.kokidayo.batterystatus.shizuku.ShellService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -68,38 +69,44 @@ class BatteryRepository(private val context: Context) {
     }
 
     /**
-     * Collects dumpsys + sysfs through the Shizuku shell service in one round trip.
-     * `batterystats` is expensive, so it is only refreshed when [withStats] is set;
-     * otherwise the previous stats from [previous] are carried over.
+     * Collects `dumpsys battery` + sysfs through the Shizuku shell service in one
+     * round trip. The (slow) batterystats excerpt is carried over from [previous];
+     * refresh it separately with [readBatteryStats].
      */
     suspend fun readShell(
         service: IShellService,
-        withStats: Boolean,
         previous: ShellData?,
+        timeoutMs: Long,
     ): ShellData = withContext(Dispatchers.IO) {
-        val script = "WITH_STATS=${if (withStats) 1 else 0}\n$collectScript"
-        val output = service.exec(script)
-        parseShellOutput(output, previous)
-    }
-
-    private fun parseShellOutput(output: String, previous: ShellData?): ShellData {
+        val output = service.exec(collectScript, timeoutMs)
+        val timedOut = output.contains(ShellService.TIMEOUT_MARKER)
         val sections = splitSections(output)
         val dumpsysRaw = sections["DUMPSYS"].orEmpty().trim()
         val sysfsRaw = sections["SYSFS"].orEmpty().trim()
-        val statsRaw = sections["STATS"]?.trim()
-
-        val dumpsys = parseKeyValueLines(dumpsysRaw)
-        val supplies = parseSysfs(sysfsRaw)
-        val stats = statsRaw?.let { parseKeyValueLines(it) } ?: previous?.batteryStats.orEmpty()
-
-        return ShellData(
-            dumpsysBattery = dumpsys,
+        if (timedOut && dumpsysRaw.isEmpty()) {
+            throw ShellTimeoutException("collect script timed out after ${timeoutMs} ms")
+        }
+        ShellData(
+            dumpsysBattery = parseKeyValueLines(dumpsysRaw),
             dumpsysRaw = dumpsysRaw,
-            powerSupplies = supplies,
-            sysfsRaw = sysfsRaw,
-            batteryStats = stats,
-            batteryStatsRaw = statsRaw ?: previous?.batteryStatsRaw.orEmpty(),
+            powerSupplies = parseSysfs(sysfsRaw),
+            sysfsRaw = if (timedOut) "$sysfsRaw\n(partial: timed out)" else sysfsRaw,
+            batteryStats = previous?.batteryStats.orEmpty(),
+            batteryStatsRaw = previous?.batteryStatsRaw.orEmpty(),
         )
+    }
+
+    /** Expensive on devices with a long battery history; run it rarely and off the main tick. */
+    suspend fun readBatteryStats(
+        service: IShellService,
+        timeoutMs: Long,
+    ): Pair<Map<String, String>, String> = withContext(Dispatchers.IO) {
+        val output = service.exec(BATTERY_STATS_COMMAND, timeoutMs)
+        val raw = output.lineSequence()
+            .filterNot { it.startsWith("###") }
+            .joinToString("\n")
+            .trim()
+        parseKeyValueLines(raw) to raw
     }
 
     private fun splitSections(output: String): Map<String, String> {
@@ -147,4 +154,13 @@ class BatteryRepository(private val context: Context) {
         }
         return map
     }
+
+    private companion object {
+        const val BATTERY_STATS_COMMAND =
+            "dumpsys batterystats 2>/dev/null | grep -E -m 20 " +
+                "'battery capacity|Time on battery|Discharge: |Screen on discharge|" +
+                "Screen off discharge|Screen doze discharge|Start clock time|Amount discharged'"
+    }
 }
+
+class ShellTimeoutException(message: String) : RuntimeException(message)

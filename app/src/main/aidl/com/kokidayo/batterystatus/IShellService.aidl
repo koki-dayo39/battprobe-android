@@ -6,8 +6,12 @@ interface IShellService {
 
     void exit() = 1;
 
-    /** Runs `sh -c <command>` as the Shizuku (shell/root) user and returns stdout+stderr. */
-    String exec(String command) = 2;
+    /**
+     * Runs `sh -c <command>` as the Shizuku (shell/root) user and returns stdout+stderr.
+     * If the command runs longer than timeoutMs it is killed and the partial output is
+     * returned with a trailing "###TIMEOUT" line.
+     */
+    String exec(String command, long timeoutMs) = 2;
 
     int getUid() = 3;
 }

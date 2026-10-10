@@ -5,6 +5,8 @@ import android.os.Process
 import androidx.annotation.Keep
 import com.kokidayo.batterystatus.IShellService
 import java.io.ByteArrayOutputStream
+import java.util.concurrent.TimeUnit
+import kotlin.concurrent.thread
 import kotlin.system.exitProcess
 
 /**
@@ -31,26 +33,47 @@ class ShellService : IShellService.Stub {
         destroy()
     }
 
-    override fun exec(command: String): String {
+    override fun exec(command: String, timeoutMs: Long): String {
         val process = ProcessBuilder("sh", "-c", command)
             .redirectErrorStream(true)
             .start()
+
         val buffer = ByteArrayOutputStream()
-        process.inputStream.use { input ->
-            val chunk = ByteArray(16 * 1024)
-            while (true) {
-                val read = input.read(chunk)
-                if (read < 0) break
-                if (buffer.size() < MAX_OUTPUT_BYTES) buffer.write(chunk, 0, read)
+        val reader = thread(name = "shell-reader", isDaemon = true) {
+            try {
+                process.inputStream.use { input ->
+                    val chunk = ByteArray(16 * 1024)
+                    while (true) {
+                        val read = input.read(chunk)
+                        if (read < 0) break
+                        synchronized(buffer) {
+                            if (buffer.size() < MAX_OUTPUT_BYTES) buffer.write(chunk, 0, read)
+                        }
+                    }
+                }
+            } catch (_: Exception) {
+                // stream closed by destroyForcibly(); partial output is fine
             }
         }
-        process.waitFor()
-        return buffer.toString(Charsets.UTF_8.name())
+
+        val finished = if (timeoutMs > 0) {
+            process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
+        } else {
+            process.waitFor(); true
+        }
+        if (!finished) {
+            process.destroyForcibly()
+        }
+        reader.join(2_000)
+
+        val output = synchronized(buffer) { buffer.toString(Charsets.UTF_8.name()) }
+        return if (finished) output else output + "\n" + TIMEOUT_MARKER + "\n"
     }
 
     override fun getUid(): Int = Process.myUid()
 
-    private companion object {
-        const val MAX_OUTPUT_BYTES = 2 * 1024 * 1024
+    companion object {
+        const val TIMEOUT_MARKER = "###TIMEOUT"
+        private const val MAX_OUTPUT_BYTES = 2 * 1024 * 1024
     }
 }

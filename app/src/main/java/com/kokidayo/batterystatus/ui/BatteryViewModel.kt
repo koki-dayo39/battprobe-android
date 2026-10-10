@@ -16,13 +16,15 @@ import com.kokidayo.batterystatus.data.SignMode
 import com.kokidayo.batterystatus.shizuku.ShizukuManager
 import com.kokidayo.batterystatus.shizuku.ShizukuState
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.abs
 
 data class UiState(
@@ -59,11 +61,13 @@ class BatteryViewModel(app: Application) : AndroidViewModel(app) {
 
     fun refreshShizuku() = ShizukuManager.refresh()
 
-    private val ticker = flow {
+    private val ticker = channelFlow {
         var polarity = 1
-        var lastStatsAt = 0L
         var lastShell: ShellData? = null
         var lastUid: Int? = null
+        var stats: Pair<Map<String, String>, String>? = null
+        var statsJob: Job? = null
+        var lastStatsAt = 0L
         val history = ArrayDeque<Float>()
 
         while (true) {
@@ -74,20 +78,22 @@ class BatteryViewModel(app: Application) : AndroidViewModel(app) {
             var shellError: String? = null
             val shell: ShellData? = if (service != null) {
                 try {
+                    val data = repository.readShell(service, lastShell, SHELL_TIMEOUT_MS)
+                    if (lastUid == null) lastUid = runCatching { service.uid }.getOrNull()
+                    val merged = stats?.let { data.copy(batteryStats = it.first, batteryStatsRaw = it.second) } ?: data
+                    lastShell = merged
+
+                    // batterystats is slow (seconds to tens of seconds); refresh it in the
+                    // background so the live readings keep ticking.
                     val now = SystemClock.elapsedRealtime()
-                    val withStats = lastShell == null || now - lastStatsAt > STATS_INTERVAL_MS
-                    val data = withTimeoutOrNull(SHELL_TIMEOUT_MS) {
-                        repository.readShell(service, withStats, lastShell)
+                    if (statsJob?.isActive != true && now - lastStatsAt > STATS_INTERVAL_MS) {
+                        lastStatsAt = now
+                        statsJob = launch {
+                            runCatching { repository.readBatteryStats(service, STATS_TIMEOUT_MS) }
+                                .onSuccess { result -> if (result.second.isNotBlank()) stats = result }
+                        }
                     }
-                    if (data != null) {
-                        if (withStats) lastStatsAt = now
-                        lastShell = data
-                        if (lastUid == null) lastUid = runCatching { service.uid }.getOrNull()
-                        data
-                    } else {
-                        shellError = "timeout"
-                        lastShell
-                    }
+                    merged
                 } catch (e: Exception) {
                     shellError = e.message ?: e.javaClass.simpleName
                     lastShell
@@ -95,6 +101,7 @@ class BatteryViewModel(app: Application) : AndroidViewModel(app) {
             } else {
                 lastShell = null
                 lastUid = null
+                stats = null
                 null
             }
 
@@ -116,11 +123,13 @@ class BatteryViewModel(app: Application) : AndroidViewModel(app) {
                 powerW = powerW,
             )
 
-            history.addLast((powerW ?: 0.0).toFloat())
-            while (history.size > UiState.HISTORY_SIZE) history.removeFirst()
+            if (powerW != null) {
+                history.addLast(powerW.toFloat())
+                while (history.size > UiState.HISTORY_SIZE) history.removeFirst()
+            }
 
-            emit(Tick(snapshot, history.toList(), shellError, lastUid))
-            kotlinx.coroutines.delay(currentSettings.intervalMs)
+            send(Tick(snapshot, history.toList(), shellError, lastUid))
+            delay(currentSettings.intervalMs)
         }
     }.flowOn(Dispatchers.IO)
 
@@ -179,7 +188,8 @@ class BatteryViewModel(app: Application) : AndroidViewModel(app) {
 
     private companion object {
         const val STATS_INTERVAL_MS = 60_000L
-        const val SHELL_TIMEOUT_MS = 8_000L
+        const val STATS_TIMEOUT_MS = 90_000L
+        const val SHELL_TIMEOUT_MS = 6_000L
         const val POLARITY_THRESHOLD_MA = 5.0
     }
 }

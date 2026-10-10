@@ -243,7 +243,7 @@ private fun HeroCard(snapshot: BatterySnapshot) {
                 modifier = Modifier.fillMaxWidth().height(10.dp),
                 color = if (charging) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary,
             )
-            local.chargeTimeRemainingMs?.takeIf { charging }?.let {
+            local.chargeTimeRemainingMs?.takeIf { charging && it >= 60_000 }?.let {
                 Spacer(Modifier.height(8.dp))
                 Text(
                     "${stringResource(R.string.label_time_to_full)}: ${formatDuration(it)}",
