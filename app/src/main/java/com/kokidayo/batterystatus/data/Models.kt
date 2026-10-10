@@ -31,9 +31,17 @@ data class LocalBattery(
 data class ShellData(
     val dumpsysBattery: Map<String, String>,
     val dumpsysRaw: String,
-    /** power_supply name -> (sysfs file -> value) */
+    /**
+     * power_supply name -> (property -> value). Standard properties come from
+     * each supply's `uevent` (refreshed every tick, keys lower-cased without the
+     * POWER_SUPPLY_ prefix); vendor files from the slow full scan are merged on top.
+     */
     val powerSupplies: Map<String, Map<String, String>>,
+    val ueventRaw: String,
+    /** Full per-file scan, refreshed rarely; carried over between ticks. */
+    val sysfsFull: Map<String, Map<String, String>>,
     val sysfsRaw: String,
+    val sysfsFullAt: Long,
     val batteryStats: Map<String, String>,
     val batteryStatsRaw: String,
 )

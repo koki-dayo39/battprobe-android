@@ -36,7 +36,10 @@ fun RawTab(state: UiState) {
             return@Column
         }
         RawBlock("$ dumpsys battery", shell.dumpsysRaw)
-        RawBlock("$ /sys/class/power_supply/*  (supply|file|value)", shell.sysfsRaw)
+        RawBlock("$ cat /sys/class/power_supply/*/uevent", shell.ueventRaw)
+        if (shell.sysfsRaw.isNotBlank()) {
+            RawBlock("$ /sys/class/power_supply/*/*  (supply|file|value, every 15 s)", shell.sysfsRaw)
+        }
         if (shell.batteryStatsRaw.isNotBlank()) {
             RawBlock("$ dumpsys batterystats | grep …", shell.batteryStatsRaw)
         }

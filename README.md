@@ -18,7 +18,7 @@ Shizuku なしでも BatteryManager から取れる範囲 (電流・電圧・W �
 ## 仕組み
 
 - Shizuku の **UserService** (`ShellService`) を shell 権限 (uid 2000。Shizuku を root で動かしていれば root) のプロセスとして起動し、AIDL 経由で `sh -c` を実行する。
-- 1 回の呼び出しで `dumpsys battery` と `/sys/class/power_supply/*` を一括取得 (`app/src/main/res/raw/collect.sh`)。重い `dumpsys batterystats` は 60 秒ごとに grep 抜粋だけ取る。
+- 画面更新 (BatteryManager) と shell 取得は別ループ。shell 側は毎回 `dumpsys battery` と各電源の `uevent` を 1 回の呼び出しで取り (`app/src/main/res/raw/collect.sh`)、ベンダー独自の sysfs ファイル全量は 15 秒ごと、重い `dumpsys batterystats` は 60 秒ごとに裏で取る。
 - 電流の単位 (µA / mA) と符号 (自動 / そのまま / 反転) は設定から切り替え可能。端末によって報告が違うため。
 
 ## 必要なもの

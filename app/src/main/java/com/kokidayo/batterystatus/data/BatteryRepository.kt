@@ -69,28 +69,41 @@ class BatteryRepository(private val context: Context) {
     }
 
     /**
-     * Collects `dumpsys battery` + sysfs through the Shizuku shell service in one
-     * round trip. The (slow) batterystats excerpt is carried over from [previous];
-     * refresh it separately with [readBatteryStats].
+     * Collects `dumpsys battery` + every supply's `uevent` through the Shizuku
+     * shell service in one round trip. With [fullSysfs] the slow per-file scan is
+     * included too; otherwise the previous scan from [previous] is carried over.
+     * The batterystats excerpt is always carried over; refresh it with [readBatteryStats].
      */
     suspend fun readShell(
         service: IShellService,
         previous: ShellData?,
+        fullSysfs: Boolean,
         timeoutMs: Long,
     ): ShellData = withContext(Dispatchers.IO) {
-        val output = service.exec(collectScript, timeoutMs)
+        val script = "FULL_SYSFS=${if (fullSysfs) 1 else 0}\n$collectScript"
+        val output = service.exec(script, timeoutMs)
         val timedOut = output.contains(ShellService.TIMEOUT_MARKER)
         val sections = splitSections(output)
         val dumpsysRaw = sections["DUMPSYS"].orEmpty().trim()
-        val sysfsRaw = sections["SYSFS"].orEmpty().trim()
+        val ueventRaw = sections["UEVENT"].orEmpty().trim()
+        val sysfsSection = sections["SYSFS"]?.trim()
         if (timedOut && dumpsysRaw.isEmpty()) {
-            throw ShellTimeoutException("collect script timed out after ${timeoutMs} ms")
+            throw ShellTimeoutException("collect script timed out after $timeoutMs ms")
         }
+
+        val fromUevent = parseUevent(ueventRaw)
+        val full = if (sysfsSection != null && !timedOut) parseSysfs(sysfsSection) else previous?.sysfsFull.orEmpty()
+        val fullRaw = if (sysfsSection != null && !timedOut) sysfsSection else previous?.sysfsRaw.orEmpty()
+        val fullAt = if (sysfsSection != null && !timedOut) System.currentTimeMillis() else previous?.sysfsFullAt ?: 0L
+
         ShellData(
             dumpsysBattery = parseKeyValueLines(dumpsysRaw),
             dumpsysRaw = dumpsysRaw,
-            powerSupplies = parseSysfs(sysfsRaw),
-            sysfsRaw = if (timedOut) "$sysfsRaw\n(partial: timed out)" else sysfsRaw,
+            powerSupplies = merge(fromUevent, full),
+            ueventRaw = ueventRaw,
+            sysfsFull = full,
+            sysfsRaw = fullRaw,
+            sysfsFullAt = fullAt,
             batteryStats = previous?.batteryStats.orEmpty(),
             batteryStatsRaw = previous?.batteryStatsRaw.orEmpty(),
         )
@@ -138,6 +151,40 @@ class BatteryRepository(private val context: Context) {
             if (key.isNotEmpty() && !map.containsKey(key)) map[key] = value
         }
         return map
+    }
+
+    /**
+     * Parses the UEVENT section: `@name` starts a supply, followed by
+     * `POWER_SUPPLY_KEY=value` lines. Keys become lower-case sysfs-style names.
+     */
+    private fun parseUevent(text: String): Map<String, Map<String, String>> {
+        val map = LinkedHashMap<String, LinkedHashMap<String, String>>()
+        var current: LinkedHashMap<String, String>? = null
+        text.lineSequence().forEach { raw ->
+            val line = raw.trim()
+            when {
+                line.startsWith("@") -> current = map.getOrPut(line.substring(1).trim()) { LinkedHashMap() }
+                line.startsWith("POWER_SUPPLY_") -> {
+                    val idx = line.indexOf('=')
+                    if (idx > 0) {
+                        val key = line.substring("POWER_SUPPLY_".length, idx).lowercase()
+                        current?.put(key, line.substring(idx + 1).trim())
+                    }
+                }
+            }
+        }
+        return map
+    }
+
+    private fun merge(
+        base: Map<String, Map<String, String>>,
+        overlay: Map<String, Map<String, String>>,
+    ): Map<String, Map<String, String>> {
+        if (overlay.isEmpty()) return base
+        val result = LinkedHashMap<String, LinkedHashMap<String, String>>()
+        base.forEach { (name, values) -> result[name] = LinkedHashMap(values) }
+        overlay.forEach { (name, values) -> result.getOrPut(name) { LinkedHashMap() }.putAll(values) }
+        return result
     }
 
     /** Parses `supply|file|value` lines emitted by collect.sh. */
