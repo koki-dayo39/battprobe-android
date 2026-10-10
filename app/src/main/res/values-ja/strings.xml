@@ -81,6 +81,11 @@
     <string name="label_present">バッテリー検出</string>
     <string name="label_level_raw">残量 / スケール</string>
     <string name="label_charging_status">充電ステータス (API 34)</string>
+    <string name="label_pd_capabilities">USB PD 対応</string>
+    <string name="label_vendor_health_index">ヘルス指数 (メーカー値)</string>
+    <string name="label_internal_resistance">内部抵抗</string>
+    <string name="label_manufacturing_date">製造日</string>
+    <string name="label_first_usage_date">使用開始日</string>
     <string name="label_status">状態</string>
 
     <string name="charging_into_battery">バッテリーへ</string>

@@ -32,6 +32,11 @@ class SettingsStore(context: Context) {
         signMode = enumOrDefault(prefs.getString(KEY_SIGN, null), SignMode.AUTO),
     )
 
+    /** +1 if the device reports charging current as positive (Android convention), -1 if inverted. */
+    var learnedPolarity: Int
+        get() = prefs.getInt(KEY_POLARITY, 1).let { if (it < 0) -1 else 1 }
+        set(value) = prefs.edit { putInt(KEY_POLARITY, if (value < 0) -1 else 1) }
+
     fun update(settings: Settings) {
         _settings.value = settings
         prefs.edit {
@@ -48,5 +53,6 @@ class SettingsStore(context: Context) {
         const val KEY_INTERVAL = "interval_ms"
         const val KEY_UNIT = "current_unit"
         const val KEY_SIGN = "sign_mode"
+        const val KEY_POLARITY = "learned_polarity"
     }
 }

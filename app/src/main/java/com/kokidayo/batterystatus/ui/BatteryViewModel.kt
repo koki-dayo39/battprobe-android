@@ -121,7 +121,8 @@ class BatteryViewModel(app: Application) : AndroidViewModel(app) {
         }
 
         // UI loop: BatteryManager is cheap, so this always runs at the configured interval.
-        var polarity = 1
+        var polarity = settingsStore.learnedPolarity
+        val polarityLearner = PolarityLearner()
         val history = ArrayDeque<Float>()
         while (true) {
             val currentSettings = settings.value
@@ -129,7 +130,13 @@ class BatteryViewModel(app: Application) : AndroidViewModel(app) {
             val shell = shellData.value
 
             val deviceMa = normaliseCurrent(local.currentNowUa, currentSettings)
-            if (deviceMa != null) polarity = updatePolarity(local, deviceMa, polarity)
+            if (deviceMa != null) {
+                val learned = polarityLearner.update(local, deviceMa, SystemClock.elapsedRealtime())
+                if (learned != null && learned != polarity) {
+                    polarity = learned
+                    settingsStore.learnedPolarity = learned
+                }
+            }
             val currentMa = deviceMa?.let { applySign(it, currentSettings, polarity) }
             val currentAvgMa = normaliseCurrent(local.currentAvgUa, currentSettings)
                 ?.let { applySign(it, currentSettings, polarity) }
@@ -190,14 +197,43 @@ class BatteryViewModel(app: Application) : AndroidViewModel(app) {
 
     /**
      * Learns whether the device reports charging current as positive (Android
-     * convention) or negative. Only updates on unambiguous states.
+     * convention, +1) or negative (-1). Two independent signals:
+     *  - Unplugged: the battery can only be discharging, so the reported current
+     *    must be negative in Android convention.
+     *  - Charge counter: integrate the reported current between samples and
+     *    compare its sign with the counter's actual change. This also works on a
+     *    weak charger where the system says "charging" while the battery drains.
      */
-    private fun updatePolarity(local: LocalBattery, deviceMa: Double, previous: Int): Int {
-        if (abs(deviceMa) < POLARITY_THRESHOLD_MA) return previous
-        return when (local.status) {
-            BatteryManager.BATTERY_STATUS_CHARGING -> if (deviceMa > 0) 1 else -1
-            BatteryManager.BATTERY_STATUS_DISCHARGING -> if (deviceMa < 0) 1 else -1
-            else -> previous
+    private class PolarityLearner {
+        private var lastTime = 0L
+        private var lastCounterUah: Int? = null
+        private var integratedMah = 0.0
+
+        fun update(local: LocalBattery, deviceMa: Double, nowMs: Long): Int? {
+            var result: Int? = null
+
+            if (local.plugged == 0 && abs(deviceMa) >= POLARITY_THRESHOLD_MA) {
+                result = if (deviceMa < 0) 1 else -1
+            }
+
+            val counter = local.chargeCounterUah
+            if (counter != null) {
+                val prevCounter = lastCounterUah
+                if (prevCounter != null && lastTime > 0L) {
+                    val dtHours = (nowMs - lastTime) / 3_600_000.0
+                    integratedMah += deviceMa * dtHours
+                    val deltaMah = (counter - prevCounter) / 1000.0
+                    if (abs(deltaMah) >= COUNTER_DELTA_MAH && abs(integratedMah) >= COUNTER_DELTA_MAH / 2) {
+                        result = if ((deltaMah > 0) == (integratedMah > 0)) 1 else -1
+                        integratedMah = 0.0
+                        lastCounterUah = counter
+                    }
+                } else {
+                    lastCounterUah = counter
+                }
+            }
+            lastTime = nowMs
+            return result
         }
     }
 
@@ -220,5 +256,6 @@ class BatteryViewModel(app: Application) : AndroidViewModel(app) {
         const val STATS_TIMEOUT_MS = 90_000L
         const val SHELL_TIMEOUT_MS = 6_000L
         const val POLARITY_THRESHOLD_MA = 5.0
+        const val COUNTER_DELTA_MAH = 8.0
     }
 }

@@ -55,11 +55,15 @@ import com.kokidayo.batterystatus.data.chargerInfo
 import com.kokidayo.batterystatus.data.cycleCount
 import com.kokidayo.batterystatus.data.designCapacityMah
 import com.kokidayo.batterystatus.data.estimatedCapacityMah
+import com.kokidayo.batterystatus.data.firstUsageDateEpoch
 import com.kokidayo.batterystatus.data.fullCapacityMah
+import com.kokidayo.batterystatus.data.internalResistanceMilliOhm
+import com.kokidayo.batterystatus.data.manufacturingDateEpoch
 import com.kokidayo.batterystatus.data.maxChargingCurrentA
 import com.kokidayo.batterystatus.data.maxChargingPowerW
 import com.kokidayo.batterystatus.data.maxChargingVoltageV
 import com.kokidayo.batterystatus.data.sysfsTemperatureC
+import com.kokidayo.batterystatus.data.vendorHealthIndex
 import com.kokidayo.batterystatus.shizuku.ShizukuManager
 import com.kokidayo.batterystatus.shizuku.ShizukuState
 
@@ -347,6 +351,7 @@ private fun ChargerCard(snapshot: BatterySnapshot) {
                 charger.chargerType?.let { KeyValueRow(stringResource(R.string.label_charger_type), it) }
                 charger.typecMode?.let { KeyValueRow(stringResource(R.string.label_typec_mode), it) }
                 charger.chargePhase?.let { KeyValueRow(stringResource(R.string.label_charge_type), it) }
+                charger.pdCapabilities?.let { KeyValueRow(stringResource(R.string.label_pd_capabilities), it) }
             }
         }
     }
@@ -362,6 +367,10 @@ private fun HealthCard(snapshot: BatterySnapshot) {
     val healthPct = snapshot.capacityHealthPercent()
     val cycles = snapshot.cycleCount()
     val sysfsTemp = snapshot.sysfsTemperatureC()
+    val vendorHealth = snapshot.vendorHealthIndex()
+    val resistance = snapshot.internalResistanceMilliOhm()
+    val manufactured = snapshot.manufacturingDateEpoch()
+    val firstUse = snapshot.firstUsageDateEpoch()
     Card {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(stringResource(R.string.card_health), style = MaterialTheme.typography.titleMedium)
@@ -395,6 +404,13 @@ private fun HealthCard(snapshot: BatterySnapshot) {
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
+            }
+            if (vendorHealth != null || resistance != null || manufactured != null || firstUse != null) {
+                HorizontalDivider()
+                vendorHealth?.let { KeyValueRow(stringResource(R.string.label_vendor_health_index), "$it") }
+                resistance?.let { KeyValueRow(stringResource(R.string.label_internal_resistance), "${it.fmt(1)} mΩ") }
+                manufactured?.let { KeyValueRow(stringResource(R.string.label_manufacturing_date), formatDate(it)) }
+                firstUse?.let { KeyValueRow(stringResource(R.string.label_first_usage_date), formatDate(it)) }
             }
         }
     }

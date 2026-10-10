@@ -119,6 +119,8 @@ data class ChargerInfo(
     val chargerType: String?,
     val typecMode: String?,
     val chargePhase: String?,
+    /** Capabilities of the Type-C port partner, e.g. "PD PD_PPS" (Pixel's tcpm supply). */
+    val pdCapabilities: String?,
 )
 
 fun BatterySnapshot.chargerInfo(): ChargerInfo? {
@@ -138,13 +140,40 @@ fun BatterySnapshot.chargerInfo(): ChargerInfo? {
         ?: battery?.get("batt_charging_source")
     val typecMode = charger?.get("typec_mode").selectedOption()
         ?: charger?.get("typec_cc_orientation")?.let { "CC$it" }
-    val chargePhase = battery?.get("charge_type").selectedOption()
-        ?.takeIf { !it.equals("N/A", true) && !it.equals("Unknown", true) }
+    // Some drivers expose a numeric charge_type on the battery and the readable one
+    // on the charger supply (Pixel: battery=3, main-charger=Fast).
+    val chargePhase = (listOfNotNull(battery) + shell.powerSupplies.values)
+        .mapNotNull { it["charge_type"].selectedOption() }
+        .firstOrNull { it.isNotBlank() && it.toDoubleOrNull() == null && !it.equals("N/A", true) && !it.equals("Unknown", true) }
 
-    val allNull = listOf(voltage, current, inputLimit, chargerType, typecMode, chargePhase).all { it == null }
+    val pdCapabilities = shell.powerSupplies.entries
+        .filter { it.value !== charger && (it.key.contains("tcpm") || it.value["type"].equals("USB", true)) }
+        .mapNotNull { it.value["usb_type"] }
+        .firstOrNull { it.contains("PD") }
+        ?.replace(Regex("[\\[\\]]"), "")?.trim()
+
+    val allNull = listOf(voltage, current, inputLimit, chargerType, typecMode, chargePhase, pdCapabilities).all { it == null }
     if (allNull && charger == null) return null
-    return ChargerInfo(voltage, current, power, inputLimit, chargerType, typecMode, chargePhase)
+    return ChargerInfo(voltage, current, power, inputLimit, chargerType, typecMode, chargePhase, pdCapabilities)
 }
 
 fun BatterySnapshot.sysfsTemperatureC(): Double? =
     shell?.batterySupply?.get("temp").leadingNumber()?.let { it / 10.0 }
+
+/** Vendor health index (0-100), e.g. Pixel's `health_index`. */
+fun BatterySnapshot.vendorHealthIndex(): Int? =
+    shell?.batterySupply?.let { b ->
+        listOf("health_index", "health_capacity_index", "batt_health").firstNotNullOfOrNull { b[it].leadingNumber()?.toInt() }
+    }?.takeIf { it in 0..100 }
+
+/** Battery internal resistance in mΩ (sysfs reports µΩ). */
+fun BatterySnapshot.internalResistanceMilliOhm(): Double? =
+    shell?.batterySupply?.let { b -> (b["resistance_avg"] ?: b["resistance"]).leadingNumber() }
+        ?.takeIf { it > 0 }?.let { if (it >= 10_000) it / 1000.0 else it }
+
+/** Epoch seconds of manufacturing / first use when the driver exposes them. */
+fun BatterySnapshot.manufacturingDateEpoch(): Long? =
+    shell?.batterySupply?.get("manufacturing_date").leadingNumber()?.toLong()?.takeIf { it > 946_684_800 }
+
+fun BatterySnapshot.firstUsageDateEpoch(): Long? =
+    shell?.batterySupply?.get("first_usage_date").leadingNumber()?.toLong()?.takeIf { it > 946_684_800 }

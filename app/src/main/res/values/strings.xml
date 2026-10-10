@@ -81,6 +81,11 @@
     <string name="label_present">Battery present</string>
     <string name="label_level_raw">Level / scale</string>
     <string name="label_charging_status">Charging status (API 34)</string>
+    <string name="label_pd_capabilities">USB PD capabilities</string>
+    <string name="label_vendor_health_index">Health index (vendor)</string>
+    <string name="label_internal_resistance">Internal resistance</string>
+    <string name="label_manufacturing_date">Manufactured</string>
+    <string name="label_first_usage_date">First used</string>
     <string name="label_status">Status</string>
 
     <string name="charging_into_battery">into battery</string>

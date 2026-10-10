@@ -22,6 +22,9 @@ fun formatDuration(ms: Long): String {
 fun formatTime(epochMs: Long): String =
     DateFormat.getTimeInstance(DateFormat.MEDIUM).format(Date(epochMs))
 
+fun formatDate(epochSeconds: Long): String =
+    DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(epochSeconds * 1000))
+
 @Composable
 fun statusLabel(status: Int): String = stringResource(
     when (status) {

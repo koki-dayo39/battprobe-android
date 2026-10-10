@@ -15,6 +15,9 @@ done
 # One background subshell per supply so a slow node bounds, not adds, total time.
 if [ "$FULL_SYSFS" = "1" ]; then
   echo '###SYSFS'
+  # Prefer the shell builtin `read -t` (mksh): no process per file, 1 s cap per read.
+  FAST=0
+  if ( read -r -t 1 _x </dev/null ) 2>/dev/null; then FAST=1; fi
   for d in /sys/class/power_supply/*/; do
     [ -d "$d" ] || continue
     (
@@ -23,8 +26,13 @@ if [ "$FULL_SYSFS" = "1" ]; then
         [ -f "$f" ] || continue
         b=${f##*/}
         [ "$b" = "uevent" ] && continue
-        v=$($T head -c 200 "$f" 2>/dev/null | tr '\n' ' ')
-        [ -n "$v" ] && echo "$n|$b|$v"
+        if [ "$FAST" = "1" ]; then
+          v=""
+          { IFS= read -r -t 1 l1 && v="$l1"; IFS= read -r -t 1 l2 && v="$v $l2"; IFS= read -r -t 1 l3 && v="$v $l3"; } <"$f" 2>/dev/null
+        else
+          v=$($T head -c 200 "$f" 2>/dev/null | tr '\n' ' ')
+        fi
+        [ -n "$v" ] && echo "$n|$b|${v%% }"
       done
     ) &
   done
