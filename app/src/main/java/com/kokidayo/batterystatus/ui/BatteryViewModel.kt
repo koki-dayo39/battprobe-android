@@ -1,47 +1,51 @@
 package com.kokidayo.batterystatus.ui
 
 import android.app.Application
-import android.os.BatteryManager
 import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.kokidayo.batterystatus.data.BatteryRepository
 import com.kokidayo.batterystatus.data.BatterySnapshot
-import com.kokidayo.batterystatus.data.CurrentUnit
+import com.kokidayo.batterystatus.data.CurrentNormalizer
 import com.kokidayo.batterystatus.data.LocalBattery
 import com.kokidayo.batterystatus.data.Settings
 import com.kokidayo.batterystatus.data.SettingsStore
 import com.kokidayo.batterystatus.data.ShellData
-import com.kokidayo.batterystatus.data.SignMode
-import com.kokidayo.batterystatus.data.batterySupply
-import com.kokidayo.batterystatus.data.leadingNumber
-import com.kokidayo.batterystatus.data.voltageToV
+import com.kokidayo.batterystatus.diag.DiagnosticsReport
+import com.kokidayo.batterystatus.shell.PrivilegeManager
+import com.kokidayo.batterystatus.shell.RootShell
+import com.kokidayo.batterystatus.shell.RootState
 import com.kokidayo.batterystatus.shizuku.ShizukuManager
 import com.kokidayo.batterystatus.shizuku.ShizukuState
-import com.kokidayo.batterystatus.diag.DiagnosticsReport
 import com.kokidayo.batterystatus.util.AppLog
+import com.kokidayo.batterystatus.widget.ChargeWidget
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.channelFlow
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import kotlin.math.abs
 
 data class UiState(
     val snapshot: BatterySnapshot? = null,
     val shizuku: ShizukuState = ShizukuState.NOT_RUNNING,
-    val shellConnected: Boolean = false,
+    val root: RootState = RootState.UNKNOWN,
+    val rootProbing: Boolean = false,
+    /** Label of the backend currently feeding shell data ("Shizuku" / "Root"), null if none. */
+    val backendLabel: String? = null,
     val shellUid: Int? = null,
     val shellError: String? = null,
     /** Battery power history in W, oldest first, at most [HISTORY_SIZE] samples. */
     val history: List<Float> = emptyList(),
 ) {
+    val shellConnected: Boolean get() = backendLabel != null
+
     companion object {
         const val HISTORY_SIZE = 120
     }
@@ -57,7 +61,7 @@ private data class Tick(
 class BatteryViewModel(app: Application) : AndroidViewModel(app) {
 
     private val repository = BatteryRepository(app)
-    private val settingsStore = SettingsStore(app)
+    private val settingsStore = SettingsStore.get(app)
 
     val settings: StateFlow<Settings> = settingsStore.settings
 
@@ -66,6 +70,8 @@ class BatteryViewModel(app: Application) : AndroidViewModel(app) {
     fun requestShizukuPermission() = ShizukuManager.requestPermission()
 
     fun refreshShizuku() = ShizukuManager.refresh()
+
+    fun requestRoot() = PrivilegeManager.requestRoot()
 
     fun buildDiagnostics(): String =
         DiagnosticsReport.build(getApplication(), uiState.value, settings.value)
@@ -81,43 +87,53 @@ class BatteryViewModel(app: Application) : AndroidViewModel(app) {
             var lastStatsAt = 0L
             var stats: Pair<Map<String, String>, String>? = null
             var statsJob: Job? = null
+            var lastBackendLabel: String? = null
             while (true) {
-                val service = ShizukuManager.service.value
-                if (service == null) {
+                val backend = PrivilegeManager.backend.value
+                if (backend == null) {
                     shellData.value = null
                     shellError.value = null
                     shellUid.value = null
                     stats = null
                     lastFullAt = 0L
                     lastStatsAt = 0L
+                    lastBackendLabel = null
                     delay(1_000)
                     continue
+                }
+                if (backend.label != lastBackendLabel) {
+                    // Backend switched: start over so stale data from the other one is not shown.
+                    lastBackendLabel = backend.label
+                    shellData.value = null
+                    shellUid.value = null
+                    lastFullAt = 0L
+                    lastStatsAt = 0L
                 }
                 val started = SystemClock.elapsedRealtime()
                 try {
                     val wantFull = started - lastFullAt > FULL_SYSFS_INTERVAL_MS
-                    val data = repository.readShell(service, shellData.value, wantFull, SHELL_TIMEOUT_MS)
+                    val data = repository.readShell(backend, shellData.value, wantFull, SHELL_TIMEOUT_MS)
                     val took = SystemClock.elapsedRealtime() - started
                     if (wantFull && data.sysfsFullAt > 0) {
                         lastFullAt = started
-                        AppLog.i(TAG, "shell read with full sysfs scan: ${took} ms, " +
+                        AppLog.i(TAG, "${backend.label}: shell read with full sysfs scan: $took ms, " +
                             "${data.sysfsFull.values.sumOf { it.size }} nodes in ${data.sysfsFull.size} supplies")
                     } else if (shellData.value == null) {
-                        AppLog.i(TAG, "first shell read: ${took} ms, ${data.powerSupplies.size} supplies via uevent")
+                        AppLog.i(TAG, "${backend.label}: first shell read: $took ms, ${data.powerSupplies.size} supplies via uevent")
                     } else if (took > SHELL_TIMEOUT_MS / 2) {
-                        AppLog.w(TAG, "slow shell read: ${took} ms")
+                        AppLog.w(TAG, "slow shell read: $took ms")
                     }
                     val merged = stats?.let { data.copy(batteryStats = it.first, batteryStatsRaw = it.second) } ?: data
                     shellData.value = merged
                     shellError.value = null
-                    if (shellUid.value == null) shellUid.value = runCatching { service.uid }.getOrNull()
+                    if (shellUid.value == null) shellUid.value = backend.uid
 
                     // batterystats is slow (seconds to tens of seconds); refresh it in the background.
                     if (statsJob?.isActive != true && started - lastStatsAt > STATS_INTERVAL_MS) {
                         lastStatsAt = started
                         statsJob = launch {
                             val t0 = SystemClock.elapsedRealtime()
-                            runCatching { repository.readBatteryStats(service, STATS_TIMEOUT_MS) }
+                            runCatching { repository.readBatteryStats(backend, STATS_TIMEOUT_MS) }
                                 .onFailure { AppLog.w(TAG, "batterystats failed", it) }
                                 .onSuccess { result ->
                                     AppLog.i(TAG, "batterystats: ${SystemClock.elapsedRealtime() - t0} ms, ${result.first.size} keys")
@@ -143,47 +159,36 @@ class BatteryViewModel(app: Application) : AndroidViewModel(app) {
         var polarity = settingsStore.learnedPolarity
         val polarityLearner = PolarityLearner()
         val history = ArrayDeque<Float>()
+        var lastWidgetPush = 0L
         while (true) {
             val currentSettings = settings.value
             val local = repository.readLocal()
             val shell = shellData.value
 
-            val deviceMa = normaliseCurrent(local.currentNowUa, currentSettings)
+            val deviceMa = CurrentNormalizer.toDeviceMa(local.currentNowUa, currentSettings)
             if (deviceMa != null) {
                 val learned = polarityLearner.update(local, deviceMa, SystemClock.elapsedRealtime())
                 if (learned != null && learned != polarity) {
                     AppLog.i(TAG, "current polarity learned: $polarity -> $learned " +
-                        "(plugged=${local.plugged}, status=${local.status}, reported=${deviceMa} mA)")
+                        "(plugged=${local.plugged}, status=${local.status}, reported=$deviceMa mA)")
                     polarity = learned
                     settingsStore.learnedPolarity = learned
                 }
             }
-            val currentMa = deviceMa?.let { applySign(it, currentSettings, polarity) }
-            val currentAvgMa = normaliseCurrent(local.currentAvgUa, currentSettings)
-                ?.let { applySign(it, currentSettings, polarity) }
-            // The sticky broadcast's voltage only changes when the system re-broadcasts
-            // (every few seconds); prefer the live sysfs reading when we have it.
-            val voltageV = shell?.batterySupply?.get("voltage_now").leadingNumber()
-                ?.voltageToV()?.takeIf { it in 2.0..12.0 }
-                ?: (local.voltageMv / 1000.0)
-            val powerW = currentMa?.let { it / 1000.0 * voltageV }
 
-            val snapshot = BatterySnapshot(
-                timestamp = System.currentTimeMillis(),
-                local = local,
-                shell = shell,
-                currentMa = currentMa,
-                currentAvgMa = currentAvgMa,
-                voltageV = voltageV,
-                powerW = powerW,
-            )
-
-            if (powerW != null) {
-                history.addLast(powerW.toFloat())
+            val snapshot = CurrentNormalizer.snapshot(local, shell, currentSettings, polarity)
+            snapshot.powerW?.let {
+                history.addLast(it.toFloat())
                 while (history.size > UiState.HISTORY_SIZE) history.removeFirst()
             }
 
             send(Tick(snapshot, history.toList(), shellError.value, shellUid.value))
+
+            val now = SystemClock.elapsedRealtime()
+            if (now - lastWidgetPush > WIDGET_PUSH_INTERVAL_MS) {
+                lastWidgetPush = now
+                ChargeWidget.render(getApplication(), snapshot)
+            }
             delay(currentSettings.intervalMs)
         }
     }.flowOn(Dispatchers.IO)
@@ -191,12 +196,16 @@ class BatteryViewModel(app: Application) : AndroidViewModel(app) {
     val uiState: StateFlow<UiState> = combine(
         ticker,
         ShizukuManager.state,
-        ShizukuManager.service,
-    ) { tick, shizukuState, service ->
+        RootShell.state,
+        PrivilegeManager.rootProbing,
+        PrivilegeManager.backend,
+    ) { tick, shizukuState, rootState, probing, backend ->
         UiState(
             snapshot = tick.snapshot,
             shizuku = shizukuState,
-            shellConnected = service != null,
+            root = rootState,
+            rootProbing = probing,
+            backendLabel = backend?.label,
             shellUid = tick.shellUid,
             shellError = tick.shellError,
             history = tick.history,
@@ -204,17 +213,12 @@ class BatteryViewModel(app: Application) : AndroidViewModel(app) {
     }.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000),
-        UiState(shizuku = ShizukuManager.state.value, shellConnected = ShizukuManager.service.value != null),
+        UiState(
+            shizuku = ShizukuManager.state.value,
+            root = RootShell.state.value,
+            backendLabel = PrivilegeManager.backend.value?.label,
+        ),
     )
-
-    /** Raw reading -> mA, in the device's own sign convention. */
-    private fun normaliseCurrent(raw: Int?, settings: Settings): Double? {
-        raw ?: return null
-        return when (settings.currentUnit) {
-            CurrentUnit.MICRO_AMP -> raw / 1000.0
-            CurrentUnit.MILLI_AMP -> raw.toDouble()
-        }
-    }
 
     /**
      * Learns whether the device reports charging current as positive (Android
@@ -258,13 +262,6 @@ class BatteryViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun applySign(deviceMa: Double, settings: Settings, polarity: Int): Double =
-        when (settings.signMode) {
-            SignMode.AS_REPORTED -> deviceMa
-            SignMode.INVERTED -> -deviceMa
-            SignMode.AUTO -> deviceMa * polarity
-        }
-
     override fun onCleared() {
         super.onCleared()
         ShizukuManager.unbindService()
@@ -273,10 +270,11 @@ class BatteryViewModel(app: Application) : AndroidViewModel(app) {
     private companion object {
         const val TAG = "BatteryViewModel"
         const val STATS_INTERVAL_MS = 60_000L
-        const val FULL_SYSFS_INTERVAL_MS = 15_000L
-        const val MIN_SHELL_GAP_MS = 200L
         const val STATS_TIMEOUT_MS = 90_000L
         const val SHELL_TIMEOUT_MS = 6_000L
+        const val FULL_SYSFS_INTERVAL_MS = 15_000L
+        const val MIN_SHELL_GAP_MS = 200L
+        const val WIDGET_PUSH_INTERVAL_MS = 5_000L
         const val POLARITY_THRESHOLD_MA = 5.0
         const val COUNTER_DELTA_MAH = 8.0
     }

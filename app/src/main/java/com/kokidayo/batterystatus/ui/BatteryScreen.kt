@@ -1,6 +1,9 @@
 package com.kokidayo.batterystatus.ui
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.net.Uri
 import android.os.BatteryManager
 import android.widget.Toast
@@ -54,6 +57,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kokidayo.batterystatus.R
@@ -78,6 +82,7 @@ import com.kokidayo.batterystatus.diag.KnownSysfs
 import com.kokidayo.batterystatus.diag.UnknownNode
 import com.kokidayo.batterystatus.util.AppLog
 import kotlinx.coroutines.launch
+import com.kokidayo.batterystatus.shell.RootState
 import com.kokidayo.batterystatus.shizuku.ShizukuManager
 import com.kokidayo.batterystatus.shizuku.ShizukuState
 
@@ -96,6 +101,21 @@ fun BatteryApp(viewModel: BatteryViewModel = viewModel()) {
     val savedMessage = stringResource(R.string.diagnostics_saved)
     val failedMessage = stringResource(R.string.diagnostics_failed)
     val copiedMessage = stringResource(R.string.copied)
+
+    val notifyDenied = stringResource(R.string.settings_notify_permission_denied)
+    val notifyLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        viewModel.updateSettings(settings.copy(notifyOnConnect = granted))
+        if (!granted) scope.launch { snackbar.showSnackbar(notifyDenied) }
+    }
+    val onNotifyToggle: (Boolean) -> Unit = { enabled ->
+        if (enabled && Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            notifyLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            viewModel.updateSettings(settings.copy(notifyOnConnect = enabled))
+        }
+    }
 
     var pendingReport by remember { mutableStateOf<String?>(null) }
     val saveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
@@ -168,6 +188,7 @@ fun BatteryApp(viewModel: BatteryViewModel = viewModel()) {
         SettingsSheet(
             settings = settings,
             onChange = viewModel::updateSettings,
+            onNotifyToggle = onNotifyToggle,
             diagnostics = diagnostics,
             onDismiss = { showSettings = false },
         )
@@ -182,7 +203,7 @@ private fun OverviewTab(state: UiState, viewModel: BatteryViewModel) {
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item { ShizukuCard(state, viewModel) }
+        item { PrivilegeCard(state, viewModel) }
         if (snapshot == null) {
             item {
                 Text(
@@ -215,35 +236,52 @@ private fun OverviewTab(state: UiState, viewModel: BatteryViewModel) {
 }
 
 @Composable
-private fun ShizukuCard(state: UiState, viewModel: BatteryViewModel) {
+private fun PrivilegeCard(state: UiState, viewModel: BatteryViewModel) {
     val context = LocalContext.current
-    val (title, desc) = when (state.shizuku) {
-        ShizukuState.NOT_INSTALLED -> R.string.shizuku_not_installed to R.string.shizuku_not_installed_desc
-        ShizukuState.NOT_RUNNING -> R.string.shizuku_not_running to R.string.shizuku_not_running_desc
-        ShizukuState.PERMISSION_REQUIRED -> R.string.shizuku_permission_required to R.string.shizuku_permission_required_desc
-        ShizukuState.PERMISSION_DENIED -> R.string.shizuku_permission_denied to R.string.shizuku_permission_denied_desc
-        ShizukuState.UNSUPPORTED_VERSION -> R.string.shizuku_unsupported to R.string.shizuku_unsupported_desc
-        ShizukuState.READY -> R.string.shizuku_title to null
-    }
-    val ready = state.shizuku == ShizukuState.READY
+    val active = state.backendLabel != null
     val containerColor = when {
-        ready && state.shellConnected -> MaterialTheme.colorScheme.secondaryContainer
-        ready -> MaterialTheme.colorScheme.surfaceVariant
+        active -> MaterialTheme.colorScheme.secondaryContainer
         else -> MaterialTheme.colorScheme.errorContainer
     }
+    val shizukuText = stringResource(
+        when (state.shizuku) {
+            ShizukuState.NOT_INSTALLED -> R.string.shizuku_not_installed
+            ShizukuState.NOT_RUNNING -> R.string.shizuku_not_running
+            ShizukuState.PERMISSION_REQUIRED -> R.string.shizuku_permission_required
+            ShizukuState.PERMISSION_DENIED -> R.string.shizuku_permission_denied
+            ShizukuState.UNSUPPORTED_VERSION -> R.string.shizuku_unsupported
+            ShizukuState.READY -> R.string.shizuku_ready_basic
+        }
+    )
+    val rootText = stringResource(
+        when {
+            state.rootProbing -> R.string.root_probing
+            state.root == RootState.GRANTED -> R.string.root_granted
+            state.root == RootState.DENIED -> R.string.root_denied
+            state.root == RootState.UNAVAILABLE -> R.string.root_unavailable
+            else -> R.string.root_unknown
+        }
+    )
 
     Card(colors = CardDefaults.cardColors(containerColor = containerColor)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(stringResource(title), style = MaterialTheme.typography.titleMedium)
-            when {
-                ready && state.shellConnected -> Text(
-                    if (state.shellUid != null) stringResource(R.string.shizuku_ready, state.shellUid)
-                    else stringResource(R.string.shizuku_ready_basic),
+            Text(stringResource(R.string.privilege_title), style = MaterialTheme.typography.titleMedium)
+            if (active) {
+                Text(
+                    if (state.shellUid != null) stringResource(R.string.privilege_active, state.backendLabel!!, state.shellUid)
+                    else stringResource(R.string.privilege_active_basic, state.backendLabel!!),
                     style = MaterialTheme.typography.bodyMedium,
                 )
-                ready -> Text(stringResource(R.string.shizuku_connecting), style = MaterialTheme.typography.bodyMedium)
-                desc != null -> Text(stringResource(desc), style = MaterialTheme.typography.bodyMedium)
+            } else {
+                Text(stringResource(R.string.privilege_none), style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    stringResource(R.string.privilege_none_desc),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
+            Text(stringResource(R.string.privilege_shizuku_line, shizukuText), style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(R.string.privilege_root_line, rootText), style = MaterialTheme.typography.bodySmall)
             state.shellError?.let {
                 Text(
                     stringResource(R.string.shell_error, it),
@@ -253,28 +291,31 @@ private fun ShizukuCard(state: UiState, viewModel: BatteryViewModel) {
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 when (state.shizuku) {
-                    ShizukuState.NOT_INSTALLED -> Button(onClick = {
+                    ShizukuState.NOT_INSTALLED -> OutlinedButton(onClick = {
                         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(ShizukuManager.SHIZUKU_URL)))
                     }) { Text(stringResource(R.string.action_install_shizuku)) }
 
-                    ShizukuState.NOT_RUNNING, ShizukuState.PERMISSION_DENIED, ShizukuState.UNSUPPORTED_VERSION -> {
-                        Button(onClick = {
+                    ShizukuState.NOT_RUNNING, ShizukuState.PERMISSION_DENIED, ShizukuState.UNSUPPORTED_VERSION ->
+                        OutlinedButton(onClick = {
                             context.packageManager.getLaunchIntentForPackage(ShizukuManager.SHIZUKU_PACKAGE)
                                 ?.let { context.startActivity(it) }
                         }) { Text(stringResource(R.string.action_open_shizuku)) }
-                        OutlinedButton(onClick = { viewModel.refreshShizuku() }) {
-                            Text(stringResource(R.string.action_retry))
-                        }
-                    }
 
                     ShizukuState.PERMISSION_REQUIRED -> Button(onClick = { viewModel.requestShizukuPermission() }) {
                         Text(stringResource(R.string.action_request_permission))
                     }
 
-                    ShizukuState.READY -> if (!state.shellConnected || state.shellError != null) {
-                        OutlinedButton(onClick = { viewModel.refreshShizuku() }) {
-                            Text(stringResource(R.string.action_retry))
-                        }
+                    ShizukuState.READY -> Unit
+                }
+                if (state.root != RootState.GRANTED) {
+                    val label = if (state.root == RootState.UNKNOWN) R.string.action_use_root else R.string.action_retry_root
+                    Button(onClick = { viewModel.requestRoot() }, enabled = !state.rootProbing) {
+                        Text(stringResource(label))
+                    }
+                }
+                if (!active || state.shellError != null) {
+                    OutlinedButton(onClick = { viewModel.refreshShizuku() }) {
+                        Text(stringResource(R.string.action_retry))
                     }
                 }
             }

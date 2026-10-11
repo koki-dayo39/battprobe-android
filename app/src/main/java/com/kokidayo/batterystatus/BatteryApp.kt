@@ -1,11 +1,11 @@
 package com.kokidayo.batterystatus
 
 import android.app.Application
-import com.kokidayo.batterystatus.shizuku.ShizukuManager
+import com.kokidayo.batterystatus.shell.PrivilegeManager
 
 class BatteryApp : Application() {
     override fun onCreate() {
         super.onCreate()
-        ShizukuManager.init(this)
+        PrivilegeManager.init(this)
     }
 }

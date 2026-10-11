@@ -6,9 +6,9 @@ import android.content.IntentFilter
 import android.os.BatteryManager
 import android.os.Build
 import androidx.core.content.ContextCompat
-import com.kokidayo.batterystatus.IShellService
 import com.kokidayo.batterystatus.R
-import com.kokidayo.batterystatus.shizuku.ShellService
+import com.kokidayo.batterystatus.shell.ShellBackend
+import com.kokidayo.batterystatus.shell.ShellTimeout
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -75,14 +75,14 @@ class BatteryRepository(private val context: Context) {
      * The batterystats excerpt is always carried over; refresh it with [readBatteryStats].
      */
     suspend fun readShell(
-        service: IShellService,
+        service: ShellBackend,
         previous: ShellData?,
         fullSysfs: Boolean,
         timeoutMs: Long,
     ): ShellData = withContext(Dispatchers.IO) {
         val script = "FULL_SYSFS=${if (fullSysfs) 1 else 0}\n$collectScript"
         val output = service.exec(script, timeoutMs)
-        val timedOut = output.contains(ShellService.TIMEOUT_MARKER)
+        val timedOut = output.contains(ShellTimeout.MARKER)
         val sections = splitSections(output)
         val dumpsysRaw = sections["DUMPSYS"].orEmpty().trim()
         val ueventRaw = sections["UEVENT"].orEmpty().trim()
@@ -111,7 +111,7 @@ class BatteryRepository(private val context: Context) {
 
     /** Expensive on devices with a long battery history; run it rarely and off the main tick. */
     suspend fun readBatteryStats(
-        service: IShellService,
+        service: ShellBackend,
         timeoutMs: Long,
     ): Pair<Map<String, String>, String> = withContext(Dispatchers.IO) {
         val output = service.exec(BATTERY_STATS_COMMAND, timeoutMs)

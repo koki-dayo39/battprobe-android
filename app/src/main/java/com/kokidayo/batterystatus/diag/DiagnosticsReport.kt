@@ -30,9 +30,12 @@ object DiagnosticsReport {
         line("currentUnit", settings.currentUnit.name)
         line("signMode", settings.signMode.name)
 
-        section("shizuku")
-        line("state", state.shizuku.name)
-        line("shellConnected", state.shellConnected.toString())
+        section("privileged access")
+        line("backend", state.backendLabel ?: "none")
+        line("shizuku", state.shizuku.name)
+        line("root", state.root.name)
+        line("backendPreference", settings.backend.name)
+        line("notifyOnConnect", settings.notifyOnConnect.toString())
         line("shellUid", state.shellUid?.toString() ?: "-")
         line("shellError", state.shellError ?: "-")
 

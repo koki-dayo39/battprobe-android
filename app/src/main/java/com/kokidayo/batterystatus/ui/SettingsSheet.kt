@@ -17,6 +17,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -24,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.kokidayo.batterystatus.R
+import com.kokidayo.batterystatus.data.BackendPreference
 import com.kokidayo.batterystatus.data.CurrentUnit
 import com.kokidayo.batterystatus.data.Settings
 import com.kokidayo.batterystatus.data.SignMode
@@ -40,6 +42,7 @@ class DiagnosticsActions(
 fun SettingsSheet(
     settings: Settings,
     onChange: (Settings) -> Unit,
+    onNotifyToggle: (Boolean) -> Unit,
     diagnostics: DiagnosticsActions,
     onDismiss: () -> Unit,
 ) {
@@ -61,6 +64,36 @@ fun SettingsSheet(
                         )
                     }
                 }
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(stringResource(R.string.settings_backend), style = MaterialTheme.typography.titleSmall)
+                Text(
+                    stringResource(R.string.settings_backend_desc),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                RadioRow(stringResource(R.string.backend_auto), settings.backend == BackendPreference.AUTO) {
+                    onChange(settings.copy(backend = BackendPreference.AUTO))
+                }
+                RadioRow(stringResource(R.string.backend_shizuku), settings.backend == BackendPreference.SHIZUKU) {
+                    onChange(settings.copy(backend = BackendPreference.SHIZUKU))
+                }
+                RadioRow(stringResource(R.string.backend_root), settings.backend == BackendPreference.ROOT) {
+                    onChange(settings.copy(backend = BackendPreference.ROOT))
+                }
+            }
+
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(stringResource(R.string.settings_notify), style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        stringResource(R.string.settings_notify_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(checked = settings.notifyOnConnect, onCheckedChange = onNotifyToggle)
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {

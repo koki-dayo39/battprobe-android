@@ -1,6 +1,6 @@
 # Battery Status (Shizuku)
 
-Shizuku 権限を使って、Android の充電速度やバッテリーの詳細ステータスをリアルタイムで表示するアプリ。
+Shizuku または root 権限を使って、Android の充電速度やバッテリーの詳細ステータスをリアルタイムで表示するアプリ。
 
 ## 見れるもの
 
@@ -14,19 +14,22 @@ Shizuku 権限を使って、Android の充電速度やバッテリーの詳細�
 | Raw | 上記の生テキスト (コピー可) | 必要 |
 | 未知の sysfs | アプリが解釈していない power_supply 項目の件数と一覧 (コピーして報告できる) | 必要 |
 | 診断 | 設定 → 診断から、端末情報・生データ・アプリ内ログをまとめたレポートを共有 / ファイル保存 / コピー | 不要 |
+| ウィジェット | ネゴシエートした「電圧 × 電流 = W」、USB タイプ、実測の充電器電力、バッテリー電流。充電中は約 60 秒ごと、アプリ起動中はリアルタイム、タップで即更新 | 必要 (値のため) |
+| 接続時通知 | 充電器をつないだ瞬間から 30 秒間、ネゴシエート値とバッテリー電力を通知に表示 (設定で ON/OFF) | 必要 (値のため) |
 
 Shizuku なしでも BatteryManager から取れる範囲 (電流・電圧・W 数など) は表示される。
 
 ## 仕組み
 
-- Shizuku の **UserService** (`ShellService`) を shell 権限 (uid 2000。Shizuku を root で動かしていれば root) のプロセスとして起動し、AIDL 経由で `sh -c` を実行する。
+- 特権実行は `ShellBackend` として抽象化。**Shizuku** は UserService (`ShellService`) を shell 権限 (uid 2000) のプロセスとして起動して AIDL 経由で `sh -c` を実行、**Root** は `su -c` を直接実行する。設定で「自動 (Shizuku 優先) / Shizuku / Root」を選べる。
+- 接続時通知とウィジェット更新は WorkManager の expedited ジョブ。`ACTION_POWER_CONNECTED` で起動し、充電中はジョブが自分を 60 秒後に再スケジュールする (充電が切れると制約で止まる)。
 - 画面更新 (BatteryManager) と shell 取得は別ループ。shell 側は毎回 `dumpsys battery` と各電源の `uevent` を 1 回の呼び出しで取り (`app/src/main/res/raw/collect.sh`)、ベンダー独自の sysfs ファイル全量は 15 秒ごと、重い `dumpsys batterystats` は 60 秒ごとに裏で取る。
 - 電流の単位 (µA / mA) と符号 (自動 / そのまま / 反転) は設定から切り替え可能。端末によって報告が違うため。
 
 ## 必要なもの
 
 - Android 8.0 (API 26) 以上
-- [Shizuku](https://shizuku.rikka.app/) 11 以上 (Sui でも可)
+- [Shizuku](https://shizuku.rikka.app/) 11 以上 (Sui でも可)、または root (Magisk / KernelSU など)
 
 ## ビルド
 
@@ -57,6 +60,9 @@ app/src/main/
 ├── java/com/kokidayo/batterystatus/
 │   ├── shizuku/ShizukuManager.kt        # binder/権限/サービス bind の状態管理
 │   ├── shizuku/ShellService.kt          # shell 権限で動く UserService
+│   ├── shell/                           # ShellBackend 抽象化、RootShell、PrivilegeManager
+│   ├── background/                      # 接続レシーバ、通知、WorkManager ジョブ
+│   ├── widget/                          # ホーム画面ウィジェット
 │   ├── data/BatteryRepository.kt        # BatteryManager + shell 出力のパース
 │   ├── data/Derived.kt                  # 容量/充電器情報などの導出
 │   └── ui/                              # Compose 画面 (概要 / 詳細 / Raw / 設定)

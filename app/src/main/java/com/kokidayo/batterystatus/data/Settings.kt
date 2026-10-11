@@ -10,17 +10,22 @@ enum class CurrentUnit { MICRO_AMP, MILLI_AMP }
 
 enum class SignMode { AUTO, AS_REPORTED, INVERTED }
 
+/** Which privileged backend to use for dumpsys / sysfs. */
+enum class BackendPreference { AUTO, SHIZUKU, ROOT }
+
 data class Settings(
     val intervalMs: Long = 1000L,
     val currentUnit: CurrentUnit = CurrentUnit.MICRO_AMP,
     val signMode: SignMode = SignMode.AUTO,
+    val backend: BackendPreference = BackendPreference.AUTO,
+    val notifyOnConnect: Boolean = true,
 ) {
     companion object {
         val INTERVAL_OPTIONS = listOf(500L, 1000L, 2000L, 5000L)
     }
 }
 
-class SettingsStore(context: Context) {
+class SettingsStore private constructor(context: Context) {
     private val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
 
     private val _settings = MutableStateFlow(load())
@@ -30,6 +35,8 @@ class SettingsStore(context: Context) {
         intervalMs = prefs.getLong(KEY_INTERVAL, 1000L),
         currentUnit = enumOrDefault(prefs.getString(KEY_UNIT, null), CurrentUnit.MICRO_AMP),
         signMode = enumOrDefault(prefs.getString(KEY_SIGN, null), SignMode.AUTO),
+        backend = enumOrDefault(prefs.getString(KEY_BACKEND, null), BackendPreference.AUTO),
+        notifyOnConnect = prefs.getBoolean(KEY_NOTIFY, true),
     )
 
     /** +1 if the device reports charging current as positive (Android convention), -1 if inverted. */
@@ -37,22 +44,39 @@ class SettingsStore(context: Context) {
         get() = prefs.getInt(KEY_POLARITY, 1).let { if (it < 0) -1 else 1 }
         set(value) = prefs.edit { putInt(KEY_POLARITY, if (value < 0) -1 else 1) }
 
+    /** Remembered so AUTO can fall back to root without prompting on every launch. */
+    var rootGranted: Boolean
+        get() = prefs.getBoolean(KEY_ROOT_GRANTED, false)
+        set(value) = prefs.edit { putBoolean(KEY_ROOT_GRANTED, value) }
+
     fun update(settings: Settings) {
         _settings.value = settings
         prefs.edit {
             putLong(KEY_INTERVAL, settings.intervalMs)
             putString(KEY_UNIT, settings.currentUnit.name)
             putString(KEY_SIGN, settings.signMode.name)
+            putString(KEY_BACKEND, settings.backend.name)
+            putBoolean(KEY_NOTIFY, settings.notifyOnConnect)
         }
     }
 
     private inline fun <reified T : Enum<T>> enumOrDefault(name: String?, default: T): T =
         enumValues<T>().firstOrNull { it.name == name } ?: default
 
-    private companion object {
-        const val KEY_INTERVAL = "interval_ms"
-        const val KEY_UNIT = "current_unit"
-        const val KEY_SIGN = "sign_mode"
-        const val KEY_POLARITY = "learned_polarity"
+    companion object {
+        private const val KEY_INTERVAL = "interval_ms"
+        private const val KEY_UNIT = "current_unit"
+        private const val KEY_SIGN = "sign_mode"
+        private const val KEY_POLARITY = "learned_polarity"
+        private const val KEY_BACKEND = "backend"
+        private const val KEY_NOTIFY = "notify_on_connect"
+        private const val KEY_ROOT_GRANTED = "root_granted"
+
+        @Volatile private var instance: SettingsStore? = null
+
+        fun get(context: Context): SettingsStore =
+            instance ?: synchronized(this) {
+                instance ?: SettingsStore(context.applicationContext).also { instance = it }
+            }
     }
 }

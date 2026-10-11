@@ -72,8 +72,8 @@ class ShellService : IShellService.Stub {
 
     override fun getUid(): Int = Process.myUid()
 
-    companion object {
-        const val TIMEOUT_MARKER = "###TIMEOUT"
-        private const val MAX_OUTPUT_BYTES = 2 * 1024 * 1024
+    private companion object {
+        const val TIMEOUT_MARKER = "###TIMEOUT" // keep in sync with ShellTimeout.MARKER
+        const val MAX_OUTPUT_BYTES = 2 * 1024 * 1024
     }
 }
