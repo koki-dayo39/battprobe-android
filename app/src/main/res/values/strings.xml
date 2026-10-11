@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Battery Status</string>
+    <string name="app_name">BattProbe</string>
 
     <string name="tab_overview">Overview</string>
     <string name="tab_details">Details</string>

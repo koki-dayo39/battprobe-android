@@ -1,1 +1,1 @@
-Live charging speed and battery health, powered by Shizuku
+Probe deep into your battery: live watts, charger, health and raw sysfs

@@ -1,4 +1,4 @@
-Battery Status shows what your battery and charger are really doing, refreshed every second.
+BattProbe shows what your battery and charger are really doing, refreshed every second.
 
 Without any special permission it reads the Android BatteryManager: level, charging state, current, voltage, power in watts, temperature and time to full.
 

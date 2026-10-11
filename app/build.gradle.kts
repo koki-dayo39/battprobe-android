@@ -1,3 +1,4 @@
+import java.util.Properties
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -6,16 +7,38 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+// Release signing comes from keystore.properties (local, git-ignored) or the
+// SIGNING_* environment variables (CI). Without either, `assembleRelease`
+// produces an unsigned APK, which is what F-Droid's build server expects.
+val keystoreProps = Properties().apply {
+    val f = rootProject.file("keystore.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+fun signingValue(prop: String, env: String): String? =
+    keystoreProps.getProperty(prop) ?: System.getenv(env)?.takeIf { it.isNotEmpty() }
+val releaseStoreFile = signingValue("storeFile", "SIGNING_STORE_FILE")
+
 android {
-    namespace = "com.kokidayo.batterystatus"
+    namespace = "io.github.koki_dayo39.battprobe"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.kokidayo.batterystatus"
+        applicationId = "io.github.koki_dayo39.battprobe"
         minSdk = 26
         targetSdk = 35
         versionCode = 1
         versionName = "1.0.0"
+    }
+
+    signingConfigs {
+        if (releaseStoreFile != null) {
+            create("release") {
+                storeFile = rootProject.file(releaseStoreFile)
+                storePassword = signingValue("storePassword", "SIGNING_STORE_PASSWORD")
+                keyAlias = signingValue("keyAlias", "SIGNING_KEY_ALIAS")
+                keyPassword = signingValue("keyPassword", "SIGNING_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
@@ -26,9 +49,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            // Personal-use app: sign release builds with the debug key so
-            // `assembleRelease` produces an installable (shrunk) APK.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release")
         }
     }
 
@@ -41,6 +62,13 @@ android {
         compose = true
         aidl = true
         buildConfig = true
+    }
+
+    // The dependency-info block is an encrypted blob only Google can read;
+    // F-Droid and IzzyOnDroid reject APKs that carry it.
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
     }
 
     packaging {

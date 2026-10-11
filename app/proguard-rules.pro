@@ -1,5 +1,5 @@
 # Shizuku user service is instantiated reflectively in the shell process.
--keep class com.kokidayo.batterystatus.shizuku.ShellService { *; }
--keep class com.kokidayo.batterystatus.IShellService { *; }
--keep class com.kokidayo.batterystatus.IShellService$Stub { *; }
+-keep class io.github.koki_dayo39.battprobe.shizuku.ShellService { *; }
+-keep class io.github.koki_dayo39.battprobe.IShellService { *; }
+-keep class io.github.koki_dayo39.battprobe.IShellService$Stub { *; }
 -keep class rikka.shizuku.** { *; }
