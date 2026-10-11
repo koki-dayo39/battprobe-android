@@ -1,0 +1,1 @@
+Blick tief in den Akku: Live-Watt, Ladegerät, Zustand und rohe sysfs-Daten

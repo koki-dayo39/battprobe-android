@@ -50,6 +50,12 @@ The F-Droid build is signed by F-Droid, while the GitHub Releases and IzzyOnDroi
 
 If the current is shown with the wrong sign or scale on your device, you can change the unit (µA / mA) and sign in Settings.
 
+## Translations
+
+BattProbe is available in English, Japanese, German, Simplified Chinese, Russian, Spanish, Brazilian Portuguese and French. On Android 13 and newer you can pick the app's language separately in system settings.
+
+Apart from English and Japanese, the translations have not been reviewed by native speakers yet. Corrections and new languages are welcome as pull requests: the app text lives in `app/src/main/res/values-<lang>/strings.xml` and the store listing in `fastlane/metadata/android/<locale>/`.
+
 ## Building
 
 ```sh
