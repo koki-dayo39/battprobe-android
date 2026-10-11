@@ -19,11 +19,11 @@ fun signingValue(prop: String, env: String): String? =
 val releaseStoreFile = signingValue("storeFile", "SIGNING_STORE_FILE")
 
 android {
-    namespace = "io.github.koki_dayo39.batterystatus"
+    namespace = "io.github.koki_dayo39.battprobe"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "io.github.koki_dayo39.batterystatus"
+        applicationId = "io.github.koki_dayo39.battprobe"
         minSdk = 26
         targetSdk = 35
         versionCode = 1

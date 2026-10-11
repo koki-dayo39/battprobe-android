@@ -51,8 +51,8 @@ GitHub Actions (`.github/workflows/build.yml`) が push ごとに debug APK と�
 
 - `fastlane/metadata/android/` に en-US / ja-JP の説明文を置いてある
 - ネットワーク権限なし、解析ツールなし。依存は AndroidX / Compose / Shizuku API (Apache-2.0) のみ
-- パッケージ名: `io.github.koki_dayo39.batterystatus`
-- F-Droid 用メタデータの下書き: `metadata/io.github.koki_dayo39.batterystatus.yml`
+- パッケージ名: `io.github.koki_dayo39.battprobe`
+- F-Droid 用メタデータの下書き: `metadata/io.github.koki_dayo39.battprobe.yml`
 - APK に Google 専用の依存情報ブロックを入れない設定済み (`dependenciesInfo`)
 
 ## 構成
@@ -60,7 +60,7 @@ GitHub Actions (`.github/workflows/build.yml`) が push ごとに debug APK と�
 ```
 app/src/main/
 ├── aidl/.../IShellService.aidl          # UserService の AIDL
-├── java/io/github/koki_dayo39/batterystatus/
+├── java/io/github/koki_dayo39/battprobe/
 │   ├── shizuku/ShizukuManager.kt        # binder/権限/サービス bind の状態管理
 │   ├── shizuku/ShellService.kt          # shell 権限で動く UserService
 │   ├── shell/                           # ShellBackend 抽象化、RootShell、PrivilegeManager

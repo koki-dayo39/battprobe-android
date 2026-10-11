@@ -84,7 +84,7 @@ GitHub のリポジトリ → Settings → Secrets and variables → Actions →
 ## 6. F-Droid 本家に申請
 
 1. https://gitlab.com/fdroid/fdroiddata をフォーク
-2. `metadata/io.github.koki_dayo39.batterystatus.yml` (このリポジトリにある下書き) をコピー
+2. `metadata/io.github.koki_dayo39.battprobe.yml` (このリポジトリにある下書き) をコピー
 3. `fdroid lint` / `fdroid build` が通るのを確認して Merge Request
    (ローカルに fdroidserver がなくても、MR の CI がチェックしてくれる)
 4. 以降は `UpdateCheckMode: Tags` なので、新しい tag を push すれば自動で追従する

@@ -4,7 +4,7 @@
 # adb shell runs as the same `shell` uid that Shizuku (adb mode) gives the app,
 # so what this script can read is exactly what the app can read.
 set -u
-APP=io.github.koki_dayo39.batterystatus
+APP=io.github.koki_dayo39.battprobe
 
 section() { echo; echo "===== $* ====="; }
 
