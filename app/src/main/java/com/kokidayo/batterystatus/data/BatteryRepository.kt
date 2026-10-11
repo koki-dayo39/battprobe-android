@@ -68,45 +68,83 @@ class BatteryRepository(private val context: Context) {
         )
     }
 
+    private val scanScript: String by lazy {
+        context.resources.openRawResource(R.raw.scan).bufferedReader().use { it.readText() }
+    }
+
+    /** Timing markers emitted by the scripts ("@@T label seconds"), as label -> seconds since start. */
+    class ShellTimings(val phases: Map<String, Double>, val notes: List<String>) {
+        val totalMs: Long get() = ((phases.values.maxOrNull() ?: 0.0) * 1000).toLong()
+        override fun toString(): String =
+            phases.entries.joinToString(" ") { "${it.key}=${(it.value * 1000).toInt()}ms" } +
+                (if (notes.isEmpty()) "" else " " + notes.joinToString(" "))
+    }
+
+    @Volatile var lastFastTimings: ShellTimings? = null
+        private set
+    @Volatile var lastScanTimings: ShellTimings? = null
+        private set
+
     /**
-     * Collects `dumpsys battery` + every supply's `uevent` through the Shizuku
-     * shell service in one round trip. With [fullSysfs] the slow per-file scan is
-     * included too; otherwise the previous scan from [previous] is carried over.
-     * The batterystats excerpt is always carried over; refresh it with [readBatteryStats].
+     * Fast path: `dumpsys battery` + every supply's `uevent` in one round trip.
+     * The slow per-file scan and batterystats are carried over from [previous];
+     * refresh them with [readFullSysfs] / [readBatteryStats].
      */
     suspend fun readShell(
         service: ShellBackend,
         previous: ShellData?,
-        fullSysfs: Boolean,
         timeoutMs: Long,
     ): ShellData = withContext(Dispatchers.IO) {
-        val script = "FULL_SYSFS=${if (fullSysfs) 1 else 0}\n$collectScript"
-        val output = service.exec(script, timeoutMs)
+        val output = service.exec(collectScript, timeoutMs)
         val timedOut = output.contains(ShellTimeout.MARKER)
+        lastFastTimings = parseTimings(output)
         val sections = splitSections(output)
         val dumpsysRaw = sections["DUMPSYS"].orEmpty().trim()
         val ueventRaw = sections["UEVENT"].orEmpty().trim()
-        val sysfsSection = sections["SYSFS"]?.trim()
         if (timedOut && dumpsysRaw.isEmpty()) {
             throw ShellTimeoutException("collect script timed out after $timeoutMs ms")
         }
-
         val fromUevent = parseUevent(ueventRaw)
-        val full = if (sysfsSection != null && !timedOut) parseSysfs(sysfsSection) else previous?.sysfsFull.orEmpty()
-        val fullRaw = if (sysfsSection != null && !timedOut) sysfsSection else previous?.sysfsRaw.orEmpty()
-        val fullAt = if (sysfsSection != null && !timedOut) System.currentTimeMillis() else previous?.sysfsFullAt ?: 0L
-
+        val full = previous?.sysfsFull.orEmpty()
         ShellData(
             dumpsysBattery = parseKeyValueLines(dumpsysRaw),
             dumpsysRaw = dumpsysRaw,
             powerSupplies = merge(fromUevent, full),
             ueventRaw = ueventRaw,
             sysfsFull = full,
-            sysfsRaw = fullRaw,
-            sysfsFullAt = fullAt,
+            sysfsRaw = previous?.sysfsRaw.orEmpty(),
+            sysfsFullAt = previous?.sysfsFullAt ?: 0L,
             batteryStats = previous?.batteryStats.orEmpty(),
             batteryStatsRaw = previous?.batteryStatsRaw.orEmpty(),
         )
+    }
+
+    /** Slow path: every file under each power supply. Returns null when it timed out. */
+    suspend fun readFullSysfs(
+        service: ShellBackend,
+        timeoutMs: Long,
+    ): Pair<Map<String, Map<String, String>>, String>? = withContext(Dispatchers.IO) {
+        val output = service.exec(scanScript, timeoutMs)
+        lastScanTimings = parseTimings(output)
+        if (output.contains(ShellTimeout.MARKER)) return@withContext null
+        val raw = splitSections(output)["SYSFS"].orEmpty().trim()
+        parseSysfs(raw) to raw
+    }
+
+    private fun parseTimings(output: String): ShellTimings {
+        val marks = LinkedHashMap<String, Double>()
+        val notes = ArrayList<String>()
+        output.lineSequence().forEach { line ->
+            when {
+                line.startsWith("@@T ") -> {
+                    val parts = line.split(' ')
+                    if (parts.size >= 3) parts[2].toDoubleOrNull()?.let { marks[parts[1]] = it }
+                }
+                line.startsWith("@@") -> notes += line.removePrefix("@@")
+            }
+        }
+        val start = marks["start"] ?: return ShellTimings(emptyMap(), notes)
+        return ShellTimings(marks.filterKeys { it != "start" }.mapValues { it.value - start }, notes)
     }
 
     /** Expensive on devices with a long battery history; run it rarely and off the main tick. */
@@ -131,6 +169,8 @@ class BatteryRepository(private val context: Context) {
                 current?.let { result[it] = buffer.toString() }
                 buffer.setLength(0)
                 current = line.removePrefix("###").trim()
+            } else if (line.startsWith("@@")) {
+                // timing / diagnostic marker, not content
             } else {
                 buffer.appendLine(line)
             }
@@ -204,9 +244,10 @@ class BatteryRepository(private val context: Context) {
 
     private companion object {
         const val BATTERY_STATS_COMMAND =
-            "dumpsys batterystats 2>/dev/null | grep -E -m 20 " +
+            "dumpsys batterystats 2>&1 | grep -E -m 20 " +
                 "'battery capacity|Time on battery|Discharge: |Screen on discharge|" +
-                "Screen off discharge|Screen doze discharge|Start clock time|Amount discharged'"
+                "Screen off discharge|Screen doze discharge|Start clock time|Amount discharged|" +
+                "^Error|[Pp]ermission|denied|not found|Can.t find'"
     }
 }
 

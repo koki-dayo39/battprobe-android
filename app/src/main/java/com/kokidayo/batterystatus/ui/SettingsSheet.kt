@@ -20,7 +20,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -31,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import com.kokidayo.batterystatus.R
 import com.kokidayo.batterystatus.data.BackendPreference
 import com.kokidayo.batterystatus.data.CurrentUnit
+import com.kokidayo.batterystatus.data.NotifyMode
 import com.kokidayo.batterystatus.data.Settings
 import com.kokidayo.batterystatus.data.SignMode
 
@@ -46,7 +46,7 @@ class DiagnosticsActions(
 fun SettingsSheet(
     settings: Settings,
     onChange: (Settings) -> Unit,
-    onNotifyToggle: (Boolean) -> Unit,
+    onNotifyMode: (NotifyMode) -> Unit,
     onTestNotification: () -> Unit,
     diagnostics: DiagnosticsActions,
     onDismiss: () -> Unit,
@@ -95,19 +95,19 @@ fun SettingsSheet(
                 }
             }
 
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(stringResource(R.string.settings_notify), style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        stringResource(R.string.settings_notify_desc),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(stringResource(R.string.settings_notify), style = MaterialTheme.typography.titleSmall)
+                Text(
+                    stringResource(R.string.settings_notify_desc),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                RadioRow(stringResource(R.string.notify_off), settings.notifyMode == NotifyMode.OFF) { onNotifyMode(NotifyMode.OFF) }
+                RadioRow(stringResource(R.string.notify_connect_30s), settings.notifyMode == NotifyMode.CONNECT_30S) { onNotifyMode(NotifyMode.CONNECT_30S) }
+                RadioRow(stringResource(R.string.notify_while_charging), settings.notifyMode == NotifyMode.WHILE_CHARGING) { onNotifyMode(NotifyMode.WHILE_CHARGING) }
+                TextButton(onClick = onTestNotification, enabled = settings.notifyMode != NotifyMode.OFF) {
+                    Text(stringResource(R.string.action_test_notification))
                 }
-                Switch(checked = settings.notifyOnConnect, onCheckedChange = onNotifyToggle)
-            }
-            TextButton(onClick = onTestNotification, enabled = settings.notifyOnConnect) {
-                Text(stringResource(R.string.action_test_notification))
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {

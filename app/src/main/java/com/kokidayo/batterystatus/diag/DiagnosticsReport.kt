@@ -35,7 +35,7 @@ object DiagnosticsReport {
         line("shizuku", state.shizuku.name)
         line("root", state.root.name)
         line("backendPreference", settings.backend.name)
-        line("notifyOnConnect", settings.notifyOnConnect.toString())
+        line("notifyMode", settings.notifyMode.name)
         line("shellUid", state.shellUid?.toString() ?: "-")
         line("shellError", state.shellError ?: "-")
 

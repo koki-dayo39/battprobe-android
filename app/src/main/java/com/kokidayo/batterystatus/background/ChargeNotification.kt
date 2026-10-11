@@ -14,6 +14,7 @@ import androidx.core.content.ContextCompat
 import com.kokidayo.batterystatus.MainActivity
 import com.kokidayo.batterystatus.R
 import com.kokidayo.batterystatus.data.BatterySnapshot
+import com.kokidayo.batterystatus.data.NotifyMode
 import com.kokidayo.batterystatus.data.chargerInfo
 import com.kokidayo.batterystatus.data.maxChargingCurrentA
 import com.kokidayo.batterystatus.data.maxChargingPowerW
@@ -46,7 +47,7 @@ object ChargeNotification {
         manager.createNotificationChannel(channel)
     }
 
-    fun build(context: Context, snapshot: BatterySnapshot?, secondsLeft: Int): Notification {
+    fun build(context: Context, snapshot: BatterySnapshot?, secondsLeft: Int, mode: NotifyMode = NotifyMode.CONNECT_30S): Notification {
         ensureChannel(context)
         val open = PendingIntent.getActivity(
             context, 0, Intent(context, MainActivity::class.java),
@@ -58,7 +59,10 @@ object ChargeNotification {
             .setContentTitle(title)
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(big))
-            .setSubText(context.getString(R.string.notification_seconds_left, secondsLeft))
+            .setSubText(
+                if (mode == NotifyMode.WHILE_CHARGING) context.getString(R.string.notification_while_charging)
+                else context.getString(R.string.notification_seconds_left, secondsLeft)
+            )
             .setContentIntent(open)
             .setOnlyAlertOnce(true)
             .setOngoing(true)

@@ -145,7 +145,7 @@
     <string name="backend_shizuku">Shizuku のみ</string>
     <string name="backend_root">Root のみ</string>
     <string name="settings_notify">充電器接続時の通知</string>
-    <string name="settings_notify_desc">充電器をつないだとき、ネゴシエートした電圧/電流とバッテリー電力を30秒だけ通知に出す。</string>
+    <string name="settings_notify_desc">充電器をつないだときに、ネゴシエートした電圧/電流とバッテリー電力を通知に出す。アプリが裏で生きていれば即時、そうでなければシステムが「充電中」と判定した時点 (残量が 1% 上がった頃) で出るよ。</string>
     <string name="settings_notify_permission_denied">通知の権限が拒否されてる。使うにはシステム設定で許可してね。</string>
     <string name="notification_channel_charging">充電器接続</string>
     <string name="notification_channel_charging_desc">充電器をつないだ後30秒間、充電の詳細を表示する。</string>
@@ -160,6 +160,10 @@
     <string name="widget_needs_privilege">Shizuku か root が必要</string>
     <string name="widget_open">開く</string>
     <string name="action_test_notification">テスト通知を出す (10 秒)</string>
+    <string name="notify_off">オフ</string>
+    <string name="notify_connect_30s">接続後 30 秒だけ</string>
+    <string name="notify_while_charging">充電中はずっと表示</string>
+    <string name="notification_while_charging">充電中</string>
     <string name="value_na">—</string>
     <string name="footer_updated">更新: %1$s</string>
     <string name="waiting_for_data">バッテリー情報を読み込み中…</string>

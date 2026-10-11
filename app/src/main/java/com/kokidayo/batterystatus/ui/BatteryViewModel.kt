@@ -8,6 +8,7 @@ import com.kokidayo.batterystatus.data.BatteryRepository
 import com.kokidayo.batterystatus.data.BatterySnapshot
 import com.kokidayo.batterystatus.data.CurrentNormalizer
 import com.kokidayo.batterystatus.data.LocalBattery
+import com.kokidayo.batterystatus.data.NotifyMode
 import com.kokidayo.batterystatus.data.Settings
 import com.kokidayo.batterystatus.data.SettingsStore
 import com.kokidayo.batterystatus.data.ShellData
@@ -18,8 +19,10 @@ import com.kokidayo.batterystatus.shell.RootState
 import com.kokidayo.batterystatus.shizuku.ShizukuManager
 import com.kokidayo.batterystatus.shizuku.ShizukuState
 import com.kokidayo.batterystatus.util.AppLog
+import com.kokidayo.batterystatus.background.ChargerEvents
 import com.kokidayo.batterystatus.background.ChargingWork
 import com.kokidayo.batterystatus.widget.ChargeWidget
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -76,6 +79,12 @@ class BatteryViewModel(app: Application) : AndroidViewModel(app) {
 
     fun testNotification() = ChargingWork.startConnectNotification(getApplication(), test = true)
 
+    fun setNotifyMode(mode: NotifyMode) {
+        settingsStore.update(settings.value.copy(notifyMode = mode))
+        ChargingWork.armChargingWatch(getApplication())
+        if (mode == NotifyMode.OFF) ChargingWork.cancelConnectNotification(getApplication())
+    }
+
     fun buildDiagnostics(): String =
         DiagnosticsReport.build(getApplication(), uiState.value, settings.value)
 
@@ -84,12 +93,16 @@ class BatteryViewModel(app: Application) : AndroidViewModel(app) {
         val shellError = MutableStateFlow<String?>(null)
         val shellUid = MutableStateFlow<Int?>(null)
 
-        // Shell loop: runs on its own cadence so a slow sysfs scan never delays the UI tick.
+        // Shell loop: runs on its own cadence so slow reads never delay the UI tick.
         launch {
             var lastFullAt = 0L
             var lastStatsAt = 0L
+            var lastTimingLogAt = 0L
             var stats: Pair<Map<String, String>, String>? = null
+            var full: Pair<Map<String, Map<String, String>>, String>? = null
+            var fullAt = 0L
             var statsJob: Job? = null
+            var fullJob: Job? = null
             var lastBackendLabel: String? = null
             while (true) {
                 val backend = PrivilegeManager.backend.value
@@ -98,6 +111,7 @@ class BatteryViewModel(app: Application) : AndroidViewModel(app) {
                     shellError.value = null
                     shellUid.value = null
                     stats = null
+                    full = null
                     lastFullAt = 0L
                     lastStatsAt = 0L
                     lastBackendLabel = null
@@ -109,27 +123,62 @@ class BatteryViewModel(app: Application) : AndroidViewModel(app) {
                     lastBackendLabel = backend.label
                     shellData.value = null
                     shellUid.value = null
+                    stats = null
+                    full = null
                     lastFullAt = 0L
                     lastStatsAt = 0L
                 }
                 val started = SystemClock.elapsedRealtime()
                 try {
-                    val wantFull = started - lastFullAt > FULL_SYSFS_INTERVAL_MS
-                    val data = repository.readShell(backend, shellData.value, wantFull, SHELL_TIMEOUT_MS)
-                    val took = SystemClock.elapsedRealtime() - started
-                    if (wantFull && data.sysfsFullAt > 0) {
-                        lastFullAt = started
-                        AppLog.i(TAG, "${backend.label}: shell read with full sysfs scan: $took ms, " +
-                            "${data.sysfsFull.values.sumOf { it.size }} nodes in ${data.sysfsFull.size} supplies")
-                    } else if (shellData.value == null) {
-                        AppLog.i(TAG, "${backend.label}: first shell read: $took ms, ${data.powerSupplies.size} supplies via uevent")
-                    } else if (took > SHELL_TIMEOUT_MS / 2) {
-                        AppLog.w(TAG, "slow shell read: $took ms")
+                    val base = shellData.value?.let { prev ->
+                        full?.let { prev.copy(sysfsFull = it.first, sysfsRaw = it.second, sysfsFullAt = fullAt) } ?: prev
                     }
-                    val merged = stats?.let { data.copy(batteryStats = it.first, batteryStatsRaw = it.second) } ?: data
+                    val data = repository.readShell(backend, base, SHELL_TIMEOUT_MS)
+                    val took = SystemClock.elapsedRealtime() - started
+                    val timings = repository.lastFastTimings
+                    if (shellData.value == null) {
+                        AppLog.i(TAG, "${backend.label}: first shell read ${took} ms (${timings}), ${data.powerSupplies.size} supplies")
+                    } else if (took > 1_500 || started - lastTimingLogAt > TIMING_LOG_INTERVAL_MS) {
+                        lastTimingLogAt = started
+                        AppLog.i(TAG, "shell read ${took} ms ($timings)")
+                    }
+                    val merged = data.copy(
+                        sysfsFull = full?.first ?: data.sysfsFull,
+                        sysfsRaw = full?.second ?: data.sysfsRaw,
+                        sysfsFullAt = if (full != null) fullAt else data.sysfsFullAt,
+                        powerSupplies = full?.let { mergeSupplies(data.powerSupplies, it.first) } ?: data.powerSupplies,
+                        batteryStats = stats?.first ?: data.batteryStats,
+                        batteryStatsRaw = stats?.second ?: data.batteryStatsRaw,
+                    )
                     shellData.value = merged
                     shellError.value = null
                     if (shellUid.value == null) shellUid.value = backend.uid
+
+                    // Full per-file scan: slow on some devices, so it runs beside the fast path.
+                    if (fullJob?.isActive != true && started - lastFullAt > FULL_SYSFS_INTERVAL_MS) {
+                        lastFullAt = started
+                        fullJob = launch {
+                            val t0 = SystemClock.elapsedRealtime()
+                            runCatching { repository.readFullSysfs(backend, FULL_TIMEOUT_MS) }
+                                .onFailure { if (it !is CancellationException) AppLog.w(TAG, "sysfs scan failed", it) }
+                                .onSuccess { result ->
+                                    val ms = SystemClock.elapsedRealtime() - t0
+                                    if (result == null) {
+                                        AppLog.w(TAG, "sysfs scan timed out after $ms ms (${repository.lastScanTimings})")
+                                    } else {
+                                        if (full == null) AppLog.i(TAG, "sysfs scan: $ms ms, ${result.first.values.sumOf { it.size }} nodes (${repository.lastScanTimings})")
+                                        full = result
+                                        fullAt = System.currentTimeMillis()
+                                        shellData.value = shellData.value?.let { prev ->
+                                            prev.copy(
+                                                sysfsFull = result.first, sysfsRaw = result.second, sysfsFullAt = fullAt,
+                                                powerSupplies = mergeSupplies(prev.powerSupplies, result.first),
+                                            )
+                                        }
+                                    }
+                                }
+                        }
+                    }
 
                     // batterystats is slow (seconds to tens of seconds); refresh it in the background.
                     if (statsJob?.isActive != true && started - lastStatsAt > STATS_INTERVAL_MS) {
@@ -137,10 +186,13 @@ class BatteryViewModel(app: Application) : AndroidViewModel(app) {
                         statsJob = launch {
                             val t0 = SystemClock.elapsedRealtime()
                             runCatching { repository.readBatteryStats(backend, STATS_TIMEOUT_MS) }
-                                .onFailure { AppLog.w(TAG, "batterystats failed", it) }
+                                .onFailure { if (it !is CancellationException) AppLog.w(TAG, "batterystats failed", it) }
                                 .onSuccess { result ->
-                                    AppLog.i(TAG, "batterystats: ${SystemClock.elapsedRealtime() - t0} ms, ${result.first.size} keys")
-                                    if (result.second.isNotBlank()) {
+                                    val ms = SystemClock.elapsedRealtime() - t0
+                                    if (result.first.isEmpty()) {
+                                        AppLog.w(TAG, "batterystats: $ms ms, no matching lines; raw=" + result.second.take(200).replace('\n', ' '))
+                                    } else {
+                                        AppLog.i(TAG, "batterystats: $ms ms, ${result.first.size} keys")
                                         stats = result
                                         shellData.value = shellData.value
                                             ?.copy(batteryStats = result.first, batteryStatsRaw = result.second)
@@ -148,6 +200,8 @@ class BatteryViewModel(app: Application) : AndroidViewModel(app) {
                                 }
                         }
                     }
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     val message = e.message ?: e.javaClass.simpleName
                     if (shellError.value != message) AppLog.w(TAG, "shell read failed", e)
@@ -163,10 +217,18 @@ class BatteryViewModel(app: Application) : AndroidViewModel(app) {
         val polarityLearner = PolarityLearner()
         val history = ArrayDeque<Float>()
         var lastWidgetPush = 0L
+        var lastPlugged: Int? = null
         while (true) {
             val currentSettings = settings.value
             val local = repository.readLocal()
             val shell = shellData.value
+
+            // Instant plug-in detection while the app is open (the system broadcast cannot wake us).
+            if (lastPlugged != null && lastPlugged != local.plugged) {
+                ChargerEvents.onPluggedChanged(getApplication(), local.plugged != 0, "app")
+            }
+            lastPlugged = local.plugged
+            if (local.plugged == 0) ChargerEvents.syncUnplugged(getApplication())
 
             val deviceMa = CurrentNormalizer.toDeviceMa(local.currentNowUa, currentSettings)
             if (deviceMa != null) {
@@ -270,8 +332,21 @@ class BatteryViewModel(app: Application) : AndroidViewModel(app) {
         ShizukuManager.unbindService()
     }
 
+    private fun mergeSupplies(
+        base: Map<String, Map<String, String>>,
+        overlay: Map<String, Map<String, String>>,
+    ): Map<String, Map<String, String>> {
+        if (overlay.isEmpty()) return base
+        val result = LinkedHashMap<String, LinkedHashMap<String, String>>()
+        base.forEach { (name, values) -> result[name] = LinkedHashMap(values) }
+        overlay.forEach { (name, values) -> result.getOrPut(name) { LinkedHashMap() }.putAll(values) }
+        return result
+    }
+
     private companion object {
         const val TAG = "BatteryViewModel"
+        const val FULL_TIMEOUT_MS = 30_000L
+        const val TIMING_LOG_INTERVAL_MS = 60_000L
         const val STATS_INTERVAL_MS = 60_000L
         const val STATS_TIMEOUT_MS = 90_000L
         const val SHELL_TIMEOUT_MS = 6_000L

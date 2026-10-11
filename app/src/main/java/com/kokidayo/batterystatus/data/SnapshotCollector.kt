@@ -15,7 +15,7 @@ class SnapshotCollector(context: Context) {
         val backend = if (backendWaitMs > 0) PrivilegeManager.awaitBackend(backendWaitMs) else PrivilegeManager.backend.value
         val shell = if (backend != null) {
             try {
-                repository.readShell(backend, previousShell, fullSysfs = false, timeoutMs = SHELL_TIMEOUT_MS)
+                repository.readShell(backend, previousShell, SHELL_TIMEOUT_MS)
                     .also { previousShell = it }
             } catch (e: Exception) {
                 AppLog.w(TAG, "background shell read failed", e)

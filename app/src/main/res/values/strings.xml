@@ -145,7 +145,7 @@
     <string name="backend_shizuku">Shizuku only</string>
     <string name="backend_root">Root only</string>
     <string name="settings_notify">Charger notification</string>
-    <string name="settings_notify_desc">When a charger is plugged in, show the negotiated voltage/current and battery power in a notification for 30 seconds.</string>
+    <string name="settings_notify_desc">Show the negotiated voltage/current and battery power in a notification when a charger is plugged in. Instant while the app is alive in the background; otherwise it appears once the system reports charging (about when the level has risen 1%).</string>
     <string name="settings_notify_permission_denied">Notification permission denied. Enable it in system settings to use this.</string>
     <string name="notification_channel_charging">Charger connected</string>
     <string name="notification_channel_charging_desc">Shows charging details for 30 seconds after a charger is plugged in.</string>
@@ -160,6 +160,10 @@
     <string name="widget_needs_privilege">Needs Shizuku or root</string>
     <string name="widget_open">OPEN</string>
     <string name="action_test_notification">Send a test notification (10 s)</string>
+    <string name="notify_off">Off</string>
+    <string name="notify_connect_30s">30 seconds after plugging in</string>
+    <string name="notify_while_charging">Always while charging</string>
+    <string name="notification_while_charging">Charging</string>
     <string name="value_na">—</string>
     <string name="footer_updated">Updated %1$s</string>
     <string name="waiting_for_data">Reading battery…</string>

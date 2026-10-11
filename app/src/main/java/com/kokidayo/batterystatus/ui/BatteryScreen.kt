@@ -62,6 +62,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kokidayo.batterystatus.R
 import com.kokidayo.batterystatus.data.BatterySnapshot
+import com.kokidayo.batterystatus.data.NotifyMode
 import com.kokidayo.batterystatus.data.capacityHealthPercent
 import com.kokidayo.batterystatus.data.chargerInfo
 import com.kokidayo.batterystatus.data.cycleCount
@@ -103,17 +104,21 @@ fun BatteryApp(viewModel: BatteryViewModel = viewModel()) {
     val copiedMessage = stringResource(R.string.copied)
 
     val notifyDenied = stringResource(R.string.settings_notify_permission_denied)
+    var pendingNotifyMode by remember { mutableStateOf<NotifyMode?>(null) }
     val notifyLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        viewModel.updateSettings(settings.copy(notifyOnConnect = granted))
+        val mode = pendingNotifyMode ?: NotifyMode.CONNECT_30S
+        pendingNotifyMode = null
+        viewModel.setNotifyMode(if (granted) mode else NotifyMode.OFF)
         if (!granted) scope.launch { snackbar.showSnackbar(notifyDenied) }
     }
-    val onNotifyToggle: (Boolean) -> Unit = { enabled ->
-        if (enabled && Build.VERSION.SDK_INT >= 33 &&
+    val onNotifyMode: (NotifyMode) -> Unit = { mode ->
+        if (mode != NotifyMode.OFF && Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) {
+            pendingNotifyMode = mode
             notifyLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         } else {
-            viewModel.updateSettings(settings.copy(notifyOnConnect = enabled))
+            viewModel.setNotifyMode(mode)
         }
     }
 
@@ -188,7 +193,7 @@ fun BatteryApp(viewModel: BatteryViewModel = viewModel()) {
         SettingsSheet(
             settings = settings,
             onChange = viewModel::updateSettings,
-            onNotifyToggle = onNotifyToggle,
+            onNotifyMode = onNotifyMode,
             onTestNotification = { viewModel.testNotification() },
             diagnostics = diagnostics,
             onDismiss = { showSettings = false },
@@ -308,7 +313,7 @@ private fun PrivilegeCard(state: UiState, viewModel: BatteryViewModel) {
 
                     ShizukuState.READY -> Unit
                 }
-                if (state.root != RootState.GRANTED) {
+                if (!active && state.root != RootState.GRANTED) {
                     val label = if (state.root == RootState.UNKNOWN) R.string.action_use_root else R.string.action_retry_root
                     Button(onClick = { viewModel.requestRoot() }, enabled = !state.rootProbing) {
                         Text(stringResource(label))
