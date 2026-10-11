@@ -22,7 +22,7 @@ Shizuku なしでも BatteryManager から取れる範囲 (電流・電圧・W �
 ## 仕組み
 
 - 特権実行は `ShellBackend` として抽象化。**Shizuku** は UserService (`ShellService`) を shell 権限 (uid 2000) のプロセスとして起動して AIDL 経由で `sh -c` を実行、**Root** は `su -c` を直接実行する。設定で「自動 (Shizuku 優先) / Shizuku / Root」を選べる。
-- 接続時通知とウィジェット更新は WorkManager の expedited ジョブ。`ACTION_POWER_CONNECTED` で起動し、充電中はジョブが自分を 60 秒後に再スケジュールする (充電が切れると制約で止まる)。
+- 接続時通知とウィジェット更新は JobScheduler の expedited ジョブ (`ChargingJobService`)。`ACTION_POWER_CONNECTED` で起動し、充電中はジョブが自分を 60 秒後に再スケジュールする (充電が切れると制約で止まる)。WorkManager は未完了ジョブの有無で自分のコンポーネントを有効/無効にして `PACKAGE_CHANGED` を発火させ、ウィジェットがプレースホルダに戻ってチカつくので使っていない。
 - 画面更新 (BatteryManager) と shell 取得は別ループ。shell 側は毎回 `dumpsys battery` と各電源の `uevent` を 1 回の呼び出しで取り (`app/src/main/res/raw/collect.sh`)、ベンダー独自の sysfs ファイル全量は 15 秒ごと、重い `dumpsys batterystats` は 60 秒ごとに裏で取る。
 - 電流の単位 (µA / mA) と符号 (自動 / そのまま / 反転) は設定から切り替え可能。端末によって報告が違うため。
 

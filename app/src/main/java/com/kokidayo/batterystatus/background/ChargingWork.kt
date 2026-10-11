@@ -1,109 +1,135 @@
 package com.kokidayo.batterystatus.background
 
 import android.app.NotificationManager
+import android.app.job.JobInfo
+import android.app.job.JobParameters
+import android.app.job.JobScheduler
+import android.app.job.JobService
+import android.content.ComponentName
 import android.content.Context
-import android.content.pm.ServiceInfo
 import android.os.Build
-import androidx.work.Constraints
-import androidx.work.CoroutineWorker
-import androidx.work.ExistingWorkPolicy
-import androidx.work.ForegroundInfo
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.OutOfQuotaPolicy
-import androidx.work.WorkManager
-import androidx.work.WorkerParameters
-import androidx.work.workDataOf
 import com.kokidayo.batterystatus.data.SnapshotCollector
 import com.kokidayo.batterystatus.util.AppLog
 import com.kokidayo.batterystatus.widget.ChargeWidget
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 
-/** Schedules and runs the background jobs: 30 s charger notification and widget refreshes. */
+/**
+ * Schedules the background jobs: the 30 s charger notification and widget refreshes.
+ *
+ * Plain JobScheduler on purpose: WorkManager toggles its RescheduleReceiver component
+ * whenever unfinished work appears/disappears, which fires PACKAGE_CHANGED and makes
+ * launchers reset app widgets to their placeholder layout (visible flicker).
+ */
 object ChargingWork {
     private const val TAG = "ChargingWork"
-    private const val WORK_NOTIFY = "charger-notify"
-    private const val WORK_WIDGET = "widget-refresh"
-    private const val WORK_WIDGET_LOOP = "widget-loop"
-    const val KEY_MODE = "mode"
-    const val MODE_NOTIFY = "notify"
-    const val MODE_WIDGET = "widget"
-    const val MODE_WIDGET_LOOP = "widget-loop"
+    const val JOB_NOTIFY = 1001
+    const val JOB_WIDGET = 1002
+    const val JOB_WIDGET_LOOP = 1003
 
     const val NOTIFY_DURATION_MS = 30_000L
     const val NOTIFY_TICK_MS = 2_000L
     private const val WIDGET_LOOP_DELAY_S = 60L
 
+    private fun scheduler(context: Context): JobScheduler =
+        context.getSystemService(JobScheduler::class.java)
+
+    private fun component(context: Context) = ComponentName(context, ChargingJobService::class.java)
+
+    /** A job that should run right away, even from the background. */
+    private fun immediate(context: Context, id: Int): JobInfo =
+        JobInfo.Builder(id, component(context)).apply {
+            if (Build.VERSION.SDK_INT >= 31) setExpedited(true) else setOverrideDeadline(0)
+        }.build()
+
     fun startConnectNotification(context: Context) {
-        val request = OneTimeWorkRequestBuilder<ChargingWorker>()
-            .setInputData(workDataOf(KEY_MODE to MODE_NOTIFY))
-            .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
-            .build()
-        WorkManager.getInstance(context).enqueueUniqueWork(WORK_NOTIFY, ExistingWorkPolicy.REPLACE, request)
+        val result = scheduler(context).schedule(immediate(context, JOB_NOTIFY))
+        if (result != JobScheduler.RESULT_SUCCESS) AppLog.w(TAG, "schedule notify job failed: $result")
     }
 
     fun cancelConnectNotification(context: Context) {
-        WorkManager.getInstance(context).cancelUniqueWork(WORK_NOTIFY)
+        scheduler(context).cancel(JOB_NOTIFY)
         context.getSystemService(NotificationManager::class.java).cancel(ChargeNotification.ID)
     }
 
     fun refreshWidgetNow(context: Context) {
         if (!ChargeWidget.hasWidgets(context)) return
-        val request = OneTimeWorkRequestBuilder<ChargingWorker>()
-            .setInputData(workDataOf(KEY_MODE to MODE_WIDGET))
-            .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
-            .build()
-        WorkManager.getInstance(context).enqueueUniqueWork(WORK_WIDGET, ExistingWorkPolicy.REPLACE, request)
+        scheduler(context).schedule(immediate(context, JOB_WIDGET))
     }
 
     /** While charging, refresh the widget about once a minute (constraint drops it when unplugged). */
     fun scheduleWidgetLoop(context: Context) {
         if (!ChargeWidget.hasWidgets(context)) return
-        val request = OneTimeWorkRequestBuilder<ChargingWorker>()
-            .setInputData(workDataOf(KEY_MODE to MODE_WIDGET_LOOP))
-            .setInitialDelay(WIDGET_LOOP_DELAY_S, TimeUnit.SECONDS)
-            .setConstraints(Constraints.Builder().setRequiresCharging(true).build())
+        val job = JobInfo.Builder(JOB_WIDGET_LOOP, component(context))
+            .setRequiresCharging(true)
+            .setMinimumLatency(TimeUnit.SECONDS.toMillis(WIDGET_LOOP_DELAY_S))
             .build()
-        WorkManager.getInstance(context).enqueueUniqueWork(WORK_WIDGET_LOOP, ExistingWorkPolicy.REPLACE, request)
+        scheduler(context).schedule(job)
     }
 
     fun cancelWidgetLoop(context: Context) {
-        WorkManager.getInstance(context).cancelUniqueWork(WORK_WIDGET_LOOP)
+        scheduler(context).cancel(JOB_WIDGET_LOOP)
     }
 }
 
-class ChargingWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
+class ChargingJobService : JobService() {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val running = HashMap<Int, Job>()
 
-    override suspend fun doWork(): Result {
-        val mode = inputData.getString(ChargingWork.KEY_MODE) ?: ChargingWork.MODE_WIDGET
+    override fun onStartJob(params: JobParameters): Boolean {
+        val id = params.jobId
+        running.remove(id)?.cancel()
         val collector = SnapshotCollector(applicationContext)
-        return try {
-            when (mode) {
-                ChargingWork.MODE_NOTIFY -> runNotification(collector)
-                else -> {
-                    val snapshot = collector.collect(backendWaitMs = 1_500)
-                    ChargeWidget.render(applicationContext, snapshot, full = mode == ChargingWork.MODE_WIDGET)
-                    if (snapshot.local.plugged != 0) ChargingWork.scheduleWidgetLoop(applicationContext)
+        running[id] = scope.launch {
+            try {
+                when (id) {
+                    ChargingWork.JOB_NOTIFY -> runNotification(collector)
+                    else -> {
+                        val snapshot = collector.collect(backendWaitMs = 1_500)
+                        ChargeWidget.render(applicationContext, snapshot, full = id == ChargingWork.JOB_WIDGET)
+                        if (snapshot.local.plugged != 0) ChargingWork.scheduleWidgetLoop(applicationContext)
+                    }
                 }
+            } catch (e: Exception) {
+                AppLog.w(TAG, "job $id failed", e)
+            } finally {
+                running.remove(id)
+                jobFinished(params, false)
             }
-            Result.success()
-        } catch (e: Exception) {
-            AppLog.w("ChargingWorker", "$mode failed", e)
-            Result.failure()
         }
+        return true
+    }
+
+    override fun onStopJob(params: JobParameters): Boolean {
+        running.remove(params.jobId)?.cancel()
+        if (params.jobId == ChargingWork.JOB_NOTIFY) {
+            getSystemService(NotificationManager::class.java).cancel(ChargeNotification.ID)
+        }
+        return false
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        scope.cancel()
     }
 
     private suspend fun runNotification(collector: SnapshotCollector) {
         val context = applicationContext
         if (!ChargeNotification.canPost(context)) {
-            AppLog.w("ChargingWorker", "notification permission missing; skipping")
+            AppLog.w(TAG, "notification permission missing; skipping")
             ChargeWidget.render(context, collector.collect(backendWaitMs = 1_500))
             return
         }
         val manager = context.getSystemService(NotificationManager::class.java)
         val start = System.currentTimeMillis()
         var snapshot = collector.collect(backendWaitMs = 2_500)
-        AppLog.i("ChargingWorker", "charger notification started (backend=${snapshot.shell?.let { "yes" } ?: "none"})")
+        AppLog.i(TAG, "charger notification started (shell=${if (snapshot.shell != null) "yes" else "none"})")
         try {
             while (true) {
                 val elapsed = System.currentTimeMillis() - start
@@ -121,13 +147,7 @@ class ChargingWorker(context: Context, params: WorkerParameters) : CoroutineWork
         }
     }
 
-    /** Required for expedited work below Android 12, where it runs as a foreground service. */
-    override suspend fun getForegroundInfo(): ForegroundInfo {
-        val notification = ChargeNotification.build(applicationContext, null, 30)
-        return if (Build.VERSION.SDK_INT >= 29) {
-            ForegroundInfo(ChargeNotification.ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
-        } else {
-            ForegroundInfo(ChargeNotification.ID, notification)
-        }
+    private companion object {
+        const val TAG = "ChargingJobService"
     }
 }
