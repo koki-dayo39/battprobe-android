@@ -18,7 +18,7 @@ data class Settings(
     val currentUnit: CurrentUnit = CurrentUnit.MICRO_AMP,
     val signMode: SignMode = SignMode.AUTO,
     val backend: BackendPreference = BackendPreference.AUTO,
-    val notifyOnConnect: Boolean = true,
+    val notifyOnConnect: Boolean = false,
 ) {
     companion object {
         val INTERVAL_OPTIONS = listOf(500L, 1000L, 2000L, 5000L)
@@ -36,7 +36,7 @@ class SettingsStore private constructor(context: Context) {
         currentUnit = enumOrDefault(prefs.getString(KEY_UNIT, null), CurrentUnit.MICRO_AMP),
         signMode = enumOrDefault(prefs.getString(KEY_SIGN, null), SignMode.AUTO),
         backend = enumOrDefault(prefs.getString(KEY_BACKEND, null), BackendPreference.AUTO),
-        notifyOnConnect = prefs.getBoolean(KEY_NOTIFY, true),
+        notifyOnConnect = prefs.getBoolean(KEY_NOTIFY, false),
     )
 
     /** +1 if the device reports charging current as positive (Android convention), -1 if inverted. */
