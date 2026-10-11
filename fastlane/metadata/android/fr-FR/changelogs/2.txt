@@ -1,0 +1,2 @@
+• Pixel : affiche le temps restant avant l'objectif de la recharge adaptative
+• La notification de charge affiche désormais tout son contenu sur l'écran de verrouillage

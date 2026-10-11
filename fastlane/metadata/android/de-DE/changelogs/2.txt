@@ -1,0 +1,2 @@
+• Pixel: zeigt die verbleibende Zeit bis zum Ziel des adaptiven Ladens
+• Die Ladebenachrichtigung zeigt ihren vollständigen Inhalt jetzt auch auf dem Sperrbildschirm
