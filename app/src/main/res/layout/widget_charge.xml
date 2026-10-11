@@ -16,7 +16,7 @@
         android:textColor="@color/widget_text"
         android:textSize="22sp"
         android:textStyle="bold"
-        android:text="— V × — A" />
+        android:text="@string/app_name" />
 
     <TextView
         android:id="@+id/widget_sub"

@@ -82,7 +82,7 @@ class ChargingWorker(context: Context, params: WorkerParameters) : CoroutineWork
                 ChargingWork.MODE_NOTIFY -> runNotification(collector)
                 else -> {
                     val snapshot = collector.collect(backendWaitMs = 1_500)
-                    ChargeWidget.render(applicationContext, snapshot)
+                    ChargeWidget.render(applicationContext, snapshot, full = mode == ChargingWork.MODE_WIDGET)
                     if (snapshot.local.plugged != 0) ChargingWork.scheduleWidgetLoop(applicationContext)
                 }
             }
