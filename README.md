@@ -36,10 +36,10 @@ Shizuku なしでも BatteryManager から取れる範囲 (電流・電圧・W �
 
 ```sh
 ./gradlew assembleDebug      # app/build/outputs/apk/debug/app-debug.apk
-./gradlew assembleRelease    # R8 で縮小。個人利用向けに debug 鍵で署名される
+./gradlew assembleRelease    # R8 で縮小。keystore.properties があれば署名、なければ未署名
 ```
 
-GitHub Actions (`.github/workflows/build.yml`) が push ごとに両方の APK を Artifacts にアップロードする。
+GitHub Actions (`.github/workflows/build.yml`) が push ごとに debug APK と未署名 release APK を Artifacts にアップロードする。`v*` の tag を push すると `.github/workflows/release.yml` が署名済み APK を GitHub Releases に出す。署名と配布の手順は [RELEASING.md](RELEASING.md)。
 
 ## 使い方
 
@@ -51,14 +51,16 @@ GitHub Actions (`.github/workflows/build.yml`) が push ごとに両方の APK �
 
 - `fastlane/metadata/android/` に en-US / ja-JP の説明文を置いてある
 - ネットワーク権限なし、解析ツールなし。依存は AndroidX / Compose / Shizuku API (Apache-2.0) のみ
-- 公開前に LICENSE ファイルを追加すること (F-Droid は FOSS ライセンス必須)
+- パッケージ名: `io.github.koki_dayo39.batterystatus`
+- F-Droid 用メタデータの下書き: `metadata/io.github.koki_dayo39.batterystatus.yml`
+- APK に Google 専用の依存情報ブロックを入れない設定済み (`dependenciesInfo`)
 
 ## 構成
 
 ```
 app/src/main/
 ├── aidl/.../IShellService.aidl          # UserService の AIDL
-├── java/com/kokidayo/batterystatus/
+├── java/io/github/koki_dayo39/batterystatus/
 │   ├── shizuku/ShizukuManager.kt        # binder/権限/サービス bind の状態管理
 │   ├── shizuku/ShellService.kt          # shell 権限で動く UserService
 │   ├── shell/                           # ShellBackend 抽象化、RootShell、PrivilegeManager
@@ -69,3 +71,9 @@ app/src/main/
 │   └── ui/                              # Compose 画面 (概要 / 詳細 / Raw / 設定)
 └── res/raw/collect.sh                   # shell 側で実行する収集スクリプト
 ```
+
+## ライセンス
+
+Copyright (C) 2026 koki-dayo39
+
+[GNU General Public License v3.0 or later](LICENSE)
