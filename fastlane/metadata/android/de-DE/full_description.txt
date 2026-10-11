@@ -1,0 +1,12 @@
+BattProbe zeigt, was dein Akku und dein Ladegerät wirklich tun – jede Sekunde aktualisiert.
+
+Ohne besondere Berechtigung liest die App den Android-BatteryManager: Ladestand, Ladezustand, Strom, Spannung, Leistung in Watt, Temperatur und Zeit bis voll.
+
+Mit Shizuku-Zugriff (kabelloses Debugging oder Root) liest sie zusätzlich dumpsys battery und jeden /sys/class/power_supply-Knoten als Shell-Nutzer:
+
+• Ausgehandelter Ladestrom/-spannung/-leistung, USB-Typ (SDP/DCP/PD), Type-C-PD-Fähigkeiten, Ladephase
+• Nennkapazität vs. gelernte volle Kapazität, Kapazitätszustand in %, Ladezyklen
+• Hersteller-Zustandsindex, Innenwiderstand, Herstellungsdatum (sofern der Treiber sie bereitstellt)
+• Rohausgaben von dumpsys, uevent und sysfs sowie eine Liste der sysfs-Knoten, die die App noch nicht versteht
+
+Ein Diagnosebericht (Geräteinfos, Rohdaten, App-Protokoll) kann in den Einstellungen geteilt oder gespeichert werden, um die Unterstützung für dein Gerät zu verbessern. Kein Netzwerkzugriff, keine Analyse.

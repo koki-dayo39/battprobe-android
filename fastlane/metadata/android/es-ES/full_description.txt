@@ -1,0 +1,12 @@
+BattProbe muestra lo que realmente hacen tu batería y tu cargador, actualizado cada segundo.
+
+Sin ningún permiso especial lee el BatteryManager de Android: nivel, estado de carga, corriente, tensión, potencia en vatios, temperatura y tiempo hasta la carga completa.
+
+Con acceso a Shizuku (depuración inalámbrica o root) también lee dumpsys battery y cada nodo de /sys/class/power_supply como usuario shell:
+
+• Corriente/tensión/potencia negociadas con el cargador, tipo de USB (SDP/DCP/PD), capacidades Type-C PD, fase de carga
+• Capacidad de diseño frente a capacidad completa aprendida, salud de la capacidad en %, ciclos de carga
+• Índice de salud del fabricante, resistencia interna, fecha de fabricación (si el controlador los expone)
+• Volcados en bruto de dumpsys, uevent y sysfs, además de una lista de nodos sysfs que la app aún no entiende
+
+Desde los ajustes se puede compartir o guardar un informe de diagnóstico (información del dispositivo, datos brutos, registro de la app) para ayudar a mejorar la compatibilidad con tu dispositivo. Sin acceso a la red, sin analíticas.
