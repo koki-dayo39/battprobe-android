@@ -1,5 +1,5 @@
 #!/bin/sh
-# Collects everything needed to debug Battery Status on a real device over adb.
+# Collects everything needed to debug BattProbe on a real device over adb.
 # Usage:  sh tools/adb-diag.sh > diag.txt   (then paste / attach diag.txt)
 # adb shell runs as the same `shell` uid that Shizuku (adb mode) gives the app,
 # so what this script can read is exactly what the app can read.

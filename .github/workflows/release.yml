@@ -62,7 +62,7 @@ jobs:
             ls app/build/outputs/apk/release/
             exit 1
           fi
-          out="BatteryStatus-$GITHUB_REF_NAME.apk"
+          out="BattProbe-$GITHUB_REF_NAME.apk"
           mv "$apk" "$out"
           "$ANDROID_HOME"/build-tools/*/apksigner verify --print-certs "$out" | head -n 5
           echo "APK=$out" >> "$GITHUB_ENV"

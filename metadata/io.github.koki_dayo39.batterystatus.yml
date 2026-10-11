@@ -7,7 +7,7 @@ AuthorName: koki-dayo39
 SourceCode: https://github.com/koki-dayo39/batterystatus-android
 IssueTracker: https://github.com/koki-dayo39/batterystatus-android/issues
 
-AutoName: Battery Status
+AutoName: BattProbe
 
 RepoType: git
 Repo: https://github.com/koki-dayo39/batterystatus-android.git

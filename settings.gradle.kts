@@ -19,5 +19,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "BatteryStatus"
+rootProject.name = "BattProbe"
 include(":app")

@@ -1,4 +1,4 @@
-# Battery Status (Shizuku)
+# BattProbe
 
 Shizuku または root 権限を使って、Android の充電速度やバッテリーの詳細ステータスをリアルタイムで表示するアプリ。
 

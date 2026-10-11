@@ -17,7 +17,7 @@ object DiagnosticsReport {
         "battery-status-diag-" + SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date()) + ".txt"
 
     fun build(context: Context, state: UiState, settings: Settings): String = buildString {
-        section("Battery Status diagnostics")
+        section("BattProbe diagnostics")
         line("generated", SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z", Locale.US).format(Date()))
         line("app", "${BuildConfig.APPLICATION_ID} ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})" +
             if (BuildConfig.DEBUG) " debug" else "")
