@@ -25,8 +25,8 @@ JDK に入ってる `keytool` で作る。パスワードは強いものを。
 
 ```sh
 keytool -genkeypair -v \
-  -keystore batterystatus-release.jks \
-  -alias batterystatus \
+  -keystore battprobe-release.jks \
+  -alias battprobe \
   -keyalg RSA -keysize 4096 -validity 10000 \
   -dname "CN=koki-dayo39"
 ```
@@ -38,7 +38,7 @@ keytool -genkeypair -v \
 証明書のフィンガープリント (IzzyOnDroid に聞かれることがある) は:
 
 ```sh
-keytool -list -v -keystore batterystatus-release.jks -alias batterystatus | grep SHA256
+keytool -list -v -keystore battprobe-release.jks -alias battprobe | grep SHA256
 ```
 
 ## 2. ローカルで署名ビルドしたいとき
@@ -46,9 +46,9 @@ keytool -list -v -keystore batterystatus-release.jks -alias batterystatus | grep
 リポジトリ直下に `keystore.properties` を作る (`.gitignore` 済み):
 
 ```properties
-storeFile=/path/to/batterystatus-release.jks
+storeFile=/path/to/battprobe-release.jks
 storePassword=****
-keyAlias=batterystatus
+keyAlias=battprobe
 keyPassword=****
 ```
 
@@ -61,9 +61,9 @@ GitHub のリポジトリ → Settings → Secrets and variables → Actions →
 
 | Secret 名 | 中身 |
 |---|---|
-| `SIGNING_KEYSTORE_BASE64` | `base64 -w0 batterystatus-release.jks` の出力 (macOS は `base64 -i batterystatus-release.jks`) |
+| `SIGNING_KEYSTORE_BASE64` | `base64 -w0 battprobe-release.jks` の出力 (macOS は `base64 -i battprobe-release.jks`) |
 | `SIGNING_STORE_PASSWORD` | keystore のパスワード |
-| `SIGNING_KEY_ALIAS` | `batterystatus` |
+| `SIGNING_KEY_ALIAS` | `battprobe` |
 | `SIGNING_KEY_PASSWORD` | 鍵のパスワード (keytool で別にしてなければ store と同じ) |
 
 ## 4. リリースを出す
