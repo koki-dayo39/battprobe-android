@@ -15,6 +15,8 @@ data class PixelInfo(
     val defenderEnabled: Boolean?,
     val defenderRechargeSoc: Int?,
     val adaptiveTargetSoc: Int?,
+    /** Estimated time until the adaptive charging target (ac_soc) is reached. */
+    val timeToAdaptiveTargetSec: Long?,
     val chargeLimit: Int?,
     val chargeDeadlineSec: Long?,
     val chargeStage: String?,
@@ -82,6 +84,7 @@ fun BatterySnapshot.pixelInfo(): PixelInfo? {
         defenderEnabled = flag("bd_trickle_enable"),
         defenderRechargeSoc = int("bd_trickle_recharge_soc"),
         adaptiveTargetSoc = int("ac_soc"),
+        timeToAdaptiveTargetSec = b["time_to_ac"].leadingNumber()?.toLong()?.takeIf { it > 0 },
         chargeLimit = int("charge_limit")?.takeIf { it >= 0 },
         chargeDeadlineSec = b["charge_deadline"].leadingNumber()?.toLong()?.takeIf { it > 0 },
         chargeStage = b["charge_stage"]?.takeIf { it.isNotBlank() },

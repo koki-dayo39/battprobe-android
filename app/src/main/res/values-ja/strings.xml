@@ -187,6 +187,7 @@
     <string name="value_active">有効</string>
     <string name="value_none">なし</string>
     <string name="value_charge_discharge">充電 %1$s · 放電 %2$s</string>
+    <string name="value_soc_eta">%1$d %% · あと %2$s</string>
     <string name="value_grace_max">%1$d サイクルから、上限 %2$d</string>
     <string name="value_na">—</string>
     <string name="footer_updated">更新: %1$s</string>

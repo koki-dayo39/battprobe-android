@@ -41,7 +41,7 @@ object KnownSysfs {
 
     /** Pixel (google_battery / Maxim fuel gauge) nodes we understand; shown on the Pixel card or known debug dumps. */
     private val PIXEL_EXACT = setOf(
-        "ac_soc", "charge_limit", "charge_deadline", "charge_stage", "charge_to_limit", "charging_speed",
+        "ac_soc", "time_to_ac", "charge_limit", "charge_deadline", "charge_stage", "charge_to_limit", "charging_speed",
         "charging_state", "charging_policy", "charger_state", "chg_profile_switch", "charge_full_estimate",
         "ssoc_details", "cycle_counts", "swelling_data", "csi_stats", "charge_details", "charge_stats_actual",
         "ttf_stats", "ttf_details", "dev_sn", "pairing_state", "sr_state", "temp_filter_enable",
