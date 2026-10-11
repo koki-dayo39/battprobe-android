@@ -187,6 +187,7 @@
     <string name="value_active">Активно</string>
     <string name="value_none">Нет</string>
     <string name="value_charge_discharge">зарядка %1$s · разрядка %2$s</string>
+    <string name="value_soc_eta">%1$d %% · через %2$s</string>
     <string name="value_grace_max">после %1$d циклов, макс. %2$d</string>
     <string name="value_na">—</string>
     <string name="footer_updated">Обновлено %1$s</string>

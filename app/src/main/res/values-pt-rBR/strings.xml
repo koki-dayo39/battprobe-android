@@ -187,6 +187,7 @@
     <string name="value_active">Ativo</string>
     <string name="value_none">Nenhum</string>
     <string name="value_charge_discharge">carga %1$s · descarga %2$s</string>
+    <string name="value_soc_eta">%1$d %% · em %2$s</string>
     <string name="value_grace_max">após %1$d ciclos, máx. %2$d</string>
     <string name="value_na">—</string>
     <string name="footer_updated">Atualizado %1$s</string>
