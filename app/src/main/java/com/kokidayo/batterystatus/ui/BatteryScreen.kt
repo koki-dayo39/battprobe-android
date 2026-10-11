@@ -189,6 +189,7 @@ fun BatteryApp(viewModel: BatteryViewModel = viewModel()) {
             settings = settings,
             onChange = viewModel::updateSettings,
             onNotifyToggle = onNotifyToggle,
+            onTestNotification = { viewModel.testNotification() },
             diagnostics = diagnostics,
             onDismiss = { showSettings = false },
         )

@@ -1,6 +1,11 @@
 package com.kokidayo.batterystatus.background
 
+import android.app.AlarmManager
 import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Intent
+import android.os.PersistableBundle
+import android.os.SystemClock
 import android.app.job.JobInfo
 import android.app.job.JobParameters
 import android.app.job.JobScheduler
@@ -48,15 +53,41 @@ object ChargingWork {
             if (Build.VERSION.SDK_INT >= 31) setExpedited(true) else setOverrideDeadline(0)
         }.build()
 
-    fun startConnectNotification(context: Context) {
-        val result = scheduler(context).schedule(immediate(context, JOB_NOTIFY))
-        if (result != JobScheduler.RESULT_SUCCESS) AppLog.w(TAG, "schedule notify job failed: $result")
+    const val EXTRA_TEST = "test"
+    const val TEST_DURATION_MS = 10_000L
+
+    /**
+     * Starts the charger notification. [test] posts it for 10 s even when unplugged
+     * (used by the settings button to verify permission and channel).
+     */
+    fun startConnectNotification(context: Context, test: Boolean = false) {
+        val extras = PersistableBundle().apply { putInt(EXTRA_TEST, if (test) 1 else 0) }
+        val job = JobInfo.Builder(JOB_NOTIFY, component(context)).apply {
+            if (Build.VERSION.SDK_INT >= 31) setExpedited(true) else setOverrideDeadline(0)
+            setExtras(extras)
+        }.build()
+        val result = scheduler(context).schedule(job)
+        AppLog.i(TAG, "notify job scheduled (test=$test): ${if (result == JobScheduler.RESULT_SUCCESS) "ok" else "failed $result"}")
+        // Safety net: even if the job never runs, the notification must not linger.
+        val duration = if (test) TEST_DURATION_MS else NOTIFY_DURATION_MS
+        context.getSystemService(AlarmManager::class.java).set(
+            AlarmManager.ELAPSED_REALTIME,
+            SystemClock.elapsedRealtime() + duration + 5_000,
+            cancelIntent(context),
+        )
     }
 
     fun cancelConnectNotification(context: Context) {
         scheduler(context).cancel(JOB_NOTIFY)
+        context.getSystemService(AlarmManager::class.java).cancel(cancelIntent(context))
         context.getSystemService(NotificationManager::class.java).cancel(ChargeNotification.ID)
     }
+
+    private fun cancelIntent(context: Context): PendingIntent = PendingIntent.getBroadcast(
+        context, 2,
+        Intent(context, ChargerReceiver::class.java).setAction(ChargerReceiver.ACTION_CANCEL_NOTIFICATION),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+    )
 
     fun refreshWidgetNow(context: Context) {
         if (!ChargeWidget.hasWidgets(context)) return
@@ -89,10 +120,10 @@ class ChargingJobService : JobService() {
         running[id] = scope.launch {
             try {
                 when (id) {
-                    ChargingWork.JOB_NOTIFY -> runNotification(collector)
+                    ChargingWork.JOB_NOTIFY -> runNotification(collector, params.extras.getInt(ChargingWork.EXTRA_TEST, 0) == 1)
                     else -> {
                         val snapshot = collector.collect(backendWaitMs = 1_500)
-                        ChargeWidget.render(applicationContext, snapshot, full = id == ChargingWork.JOB_WIDGET)
+                        ChargeWidget.render(applicationContext, snapshot, force = id == ChargingWork.JOB_WIDGET)
                         if (snapshot.local.plugged != 0) ChargingWork.scheduleWidgetLoop(applicationContext)
                     }
                 }
@@ -107,6 +138,8 @@ class ChargingJobService : JobService() {
     }
 
     override fun onStopJob(params: JobParameters): Boolean {
+        AppLog.w(TAG, "job ${params.jobId} stopped by system" +
+            if (Build.VERSION.SDK_INT >= 31) " (reason ${params.stopReason})" else "")
         running.remove(params.jobId)?.cancel()
         if (params.jobId == ChargingWork.JOB_NOTIFY) {
             getSystemService(NotificationManager::class.java).cancel(ChargeNotification.ID)
@@ -119,7 +152,7 @@ class ChargingJobService : JobService() {
         scope.cancel()
     }
 
-    private suspend fun runNotification(collector: SnapshotCollector) {
+    private suspend fun runNotification(collector: SnapshotCollector, test: Boolean) {
         val context = applicationContext
         if (!ChargeNotification.canPost(context)) {
             AppLog.w(TAG, "notification permission missing; skipping")
@@ -127,21 +160,26 @@ class ChargingJobService : JobService() {
             return
         }
         val manager = context.getSystemService(NotificationManager::class.java)
+        val duration = if (test) ChargingWork.TEST_DURATION_MS else ChargingWork.NOTIFY_DURATION_MS
         val start = System.currentTimeMillis()
         var snapshot = collector.collect(backendWaitMs = 2_500)
-        AppLog.i(TAG, "charger notification started (shell=${if (snapshot.shell != null) "yes" else "none"})")
+        AppLog.i(TAG, "charger notification job running (test=$test, plugged=${snapshot.local.plugged}, " +
+            "shell=${if (snapshot.shell != null) "yes" else "none"})")
+        var ticks = 0
         try {
             while (true) {
                 val elapsed = System.currentTimeMillis() - start
-                val left = ((ChargingWork.NOTIFY_DURATION_MS - elapsed) / 1000).toInt().coerceAtLeast(0)
-                if (snapshot.local.plugged == 0) break
+                val left = ((duration - elapsed) / 1000).toInt().coerceAtLeast(0)
+                if (!test && snapshot.local.plugged == 0) break
                 manager.notify(ChargeNotification.ID, ChargeNotification.build(context, snapshot, left))
+                ticks++
                 ChargeWidget.render(context, snapshot)
-                if (elapsed >= ChargingWork.NOTIFY_DURATION_MS) break
+                if (elapsed >= duration) break
                 delay(ChargingWork.NOTIFY_TICK_MS)
                 snapshot = collector.collect()
             }
         } finally {
+            AppLog.i(TAG, "charger notification finished after $ticks updates")
             manager.cancel(ChargeNotification.ID)
             if (snapshot.local.plugged != 0) ChargingWork.scheduleWidgetLoop(context)
         }

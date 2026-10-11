@@ -47,6 +47,7 @@ fun SettingsSheet(
     settings: Settings,
     onChange: (Settings) -> Unit,
     onNotifyToggle: (Boolean) -> Unit,
+    onTestNotification: () -> Unit,
     diagnostics: DiagnosticsActions,
     onDismiss: () -> Unit,
 ) {
@@ -104,6 +105,9 @@ fun SettingsSheet(
                     )
                 }
                 Switch(checked = settings.notifyOnConnect, onCheckedChange = onNotifyToggle)
+            }
+            TextButton(onClick = onTestNotification, enabled = settings.notifyOnConnect) {
+                Text(stringResource(R.string.action_test_notification))
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {

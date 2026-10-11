@@ -18,6 +18,7 @@ import com.kokidayo.batterystatus.shell.RootState
 import com.kokidayo.batterystatus.shizuku.ShizukuManager
 import com.kokidayo.batterystatus.shizuku.ShizukuState
 import com.kokidayo.batterystatus.util.AppLog
+import com.kokidayo.batterystatus.background.ChargingWork
 import com.kokidayo.batterystatus.widget.ChargeWidget
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -72,6 +73,8 @@ class BatteryViewModel(app: Application) : AndroidViewModel(app) {
     fun refreshShizuku() = ShizukuManager.refresh()
 
     fun requestRoot() = PrivilegeManager.requestRoot()
+
+    fun testNotification() = ChargingWork.startConnectNotification(getApplication(), test = true)
 
     fun buildDiagnostics(): String =
         DiagnosticsReport.build(getApplication(), uiState.value, settings.value)

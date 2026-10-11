@@ -61,6 +61,27 @@ fun healthLabel(health: Int): String = stringResource(
     }
 )
 
+fun statusLabelPlain(context: android.content.Context, status: Int): String = context.getString(
+    when (status) {
+        BatteryManager.BATTERY_STATUS_CHARGING -> R.string.status_charging
+        BatteryManager.BATTERY_STATUS_DISCHARGING -> R.string.status_discharging
+        BatteryManager.BATTERY_STATUS_FULL -> R.string.status_full
+        BatteryManager.BATTERY_STATUS_NOT_CHARGING -> R.string.status_not_charging
+        else -> R.string.status_unknown
+    }
+)
+
+fun pluggedLabelPlain(context: android.content.Context, plugged: Int): String = context.getString(
+    when (plugged) {
+        BatteryManager.BATTERY_PLUGGED_AC -> R.string.plugged_ac
+        BatteryManager.BATTERY_PLUGGED_USB -> R.string.plugged_usb
+        BatteryManager.BATTERY_PLUGGED_WIRELESS -> R.string.plugged_wireless
+        8 -> R.string.plugged_dock
+        0 -> R.string.plugged_none
+        else -> R.string.status_unknown
+    }
+)
+
 fun chargingStatusLabel(status: Int?): String? = when (status) {
     null -> null
     1 -> "Normal"

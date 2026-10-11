@@ -5,16 +5,19 @@
     android:layout_height="match_parent"
     android:background="@drawable/widget_background"
     android:orientation="vertical"
+    android:gravity="center_vertical"
     android:padding="12dp">
 
     <TextView
         android:id="@+id/widget_headline"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="30dp"
+        android:gravity="center_vertical"
         android:maxLines="1"
-        android:ellipsize="end"
+        android:autoSizeTextType="uniform"
+        android:autoSizeMinTextSize="12sp"
+        android:autoSizeMaxTextSize="24sp"
         android:textColor="@color/widget_text"
-        android:textSize="22sp"
         android:textStyle="bold"
         android:text="@string/app_name" />
 
