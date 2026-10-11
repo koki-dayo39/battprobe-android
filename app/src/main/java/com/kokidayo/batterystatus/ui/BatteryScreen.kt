@@ -7,6 +7,7 @@ import android.os.Build
 import android.net.Uri
 import android.os.BatteryManager
 import android.widget.Toast
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -50,7 +51,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
@@ -63,6 +68,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kokidayo.batterystatus.R
 import com.kokidayo.batterystatus.data.BatterySnapshot
 import com.kokidayo.batterystatus.data.NotifyMode
+import com.kokidayo.batterystatus.data.PixelInfo
+import com.kokidayo.batterystatus.data.pixelInfo
 import com.kokidayo.batterystatus.data.capacityHealthPercent
 import com.kokidayo.batterystatus.data.chargerInfo
 import com.kokidayo.batterystatus.data.cycleCount
@@ -223,6 +230,7 @@ private fun OverviewTab(state: UiState, viewModel: BatteryViewModel) {
             item { PowerCard(snapshot, state.history) }
             item { ChargerCard(snapshot) }
             item { HealthCard(snapshot) }
+            snapshot.pixelInfo()?.let { info -> item { PixelCard(info) } }
             item { InfoCard(snapshot) }
             snapshot.shell?.let { shell ->
                 val unknown = KnownSysfs.unknownNodes(shell)
@@ -518,6 +526,113 @@ private fun HealthCard(snapshot: BatterySnapshot) {
                 manufactured?.let { KeyValueRow(stringResource(R.string.label_manufacturing_date), formatDate(it)) }
                 firstUse?.let { KeyValueRow(stringResource(R.string.label_first_usage_date), formatDate(it)) }
             }
+        }
+    }
+}
+
+@Composable
+private fun PixelCard(info: PixelInfo) {
+    val na = stringResource(R.string.value_na)
+    val enabled = stringResource(R.string.value_enabled)
+    val disabled = stringResource(R.string.value_disabled)
+    fun onOff(v: Boolean?): String = when (v) { true -> enabled; false -> disabled; null -> na }
+    Card {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.card_pixel), style = MaterialTheme.typography.titleMedium)
+
+            info.aafvOffsetMv?.let {
+                KeyValueRow(
+                    stringResource(R.string.label_aafv),
+                    (if (it > 0) "−${it.fmt(0)} mV" else "0 mV") + (info.aafvEnabled?.let { e -> " · ${onOff(e)}" } ?: ""),
+                )
+            }
+            info.aafvProfile?.let { KeyValueRow(stringResource(R.string.label_aafv_profile), it) }
+            info.healthAssistanceOptedOut?.let {
+                KeyValueRow(
+                    stringResource(R.string.label_health_assistance),
+                    if (it) stringResource(R.string.value_opted_out) else stringResource(R.string.value_active),
+                )
+            }
+            info.aacrEnabled?.let {
+                val detail = if (info.aacrCycleGrace != null && info.aacrCycleMax != null) {
+                    " · " + stringResource(R.string.value_grace_max, info.aacrCycleGrace, info.aacrCycleMax)
+                } else ""
+                KeyValueRow(stringResource(R.string.label_aacr), onOff(it) + detail)
+            }
+            info.defenderEnabled?.let {
+                KeyValueRow(
+                    stringResource(R.string.label_defender),
+                    onOff(it) + (info.defenderRechargeSoc?.let { soc -> " · $soc %" } ?: ""),
+                )
+            }
+            info.adaptiveTargetSoc?.let { KeyValueRow(stringResource(R.string.label_adaptive_target), "$it %") }
+            KeyValueRow(stringResource(R.string.label_charge_limit), info.chargeLimit?.let { "$it %" } ?: stringResource(R.string.value_none))
+            info.chargeDeadlineSec?.let { KeyValueRow(stringResource(R.string.label_charge_deadline), formatDuration(it * 1000)) }
+            info.chargeStage?.let { KeyValueRow(stringResource(R.string.label_charge_stage), it) }
+            info.chargingSpeed?.let { KeyValueRow(stringResource(R.string.label_csi), it.toString()) }
+
+            HorizontalDivider()
+            if (info.gaugeSocPct != null) {
+                KeyValueRow(
+                    stringResource(R.string.label_gauge_soc),
+                    "${info.gaugeSocPct.fmt(1)} % → ${info.shownSocPct?.toString() ?: na} %",
+                )
+            }
+            info.gaugeFullCapMah?.let { KeyValueRow(stringResource(R.string.label_gauge_full_cap), "${it.fmt(0)} mAh") }
+            info.gaugeImpedanceMilliOhm?.let { KeyValueRow(stringResource(R.string.label_gauge_impedance), "${it.fmt(1)} mΩ") }
+            if (info.avgCurrentMa != null || info.avgPowerMw != null) {
+                KeyValueRow(
+                    stringResource(R.string.label_power_metrics),
+                    listOfNotNull(info.avgCurrentMa?.let { "${it.fmtSigned(0)} mA" }, info.avgPowerMw?.let { "${it.fmtSigned(0)} mW" })
+                        .joinToString(" · "),
+                )
+            }
+            if (info.swellingChargeSec != null || info.swellingDischargeSec != null) {
+                KeyValueRow(
+                    stringResource(R.string.label_swelling),
+                    stringResource(
+                        R.string.value_charge_discharge,
+                        info.swellingChargeSec?.let { formatDuration(it * 1000) } ?: na,
+                        info.swellingDischargeSec?.let { formatDuration(it * 1000) } ?: na,
+                    ),
+                )
+            }
+            info.cycleHistogram?.let { hist ->
+                HorizontalDivider()
+                Text(
+                    stringResource(R.string.label_cycle_histogram),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                CycleHistogram(hist, Modifier.fillMaxWidth().height(96.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun CycleHistogram(values: List<Int>, modifier: Modifier = Modifier) {
+    val barColor = MaterialTheme.colorScheme.primary
+    val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val labelStyle = MaterialTheme.typography.labelSmall
+    val measurer = rememberTextMeasurer()
+    Canvas(modifier) {
+        val max = (values.maxOrNull() ?: 0).coerceAtLeast(1)
+        val labelHeight = 14.dp.toPx()
+        val gap = 4.dp.toPx()
+        val barWidth = (size.width - gap * (values.size - 1)) / values.size
+        val chartHeight = size.height - labelHeight - 2.dp.toPx()
+        values.forEachIndexed { i, v ->
+            val h = chartHeight * v / max
+            val x = i * (barWidth + gap)
+            drawRoundRect(
+                color = barColor,
+                topLeft = Offset(x, chartHeight - h),
+                size = androidx.compose.ui.geometry.Size(barWidth, h),
+                cornerRadius = CornerRadius(3.dp.toPx()),
+            )
+            val label = measurer.measure("${i * 10}", style = labelStyle.copy(color = labelColor))
+            drawText(label, topLeft = Offset(x + (barWidth - label.size.width) / 2, chartHeight + 2.dp.toPx()))
         }
     }
 }

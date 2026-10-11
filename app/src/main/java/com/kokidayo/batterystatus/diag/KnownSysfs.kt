@@ -39,8 +39,24 @@ object KnownSysfs {
         "batt_health", "batt_temp",
     )
 
+    /** Pixel (google_battery / Maxim fuel gauge) nodes we understand; shown on the Pixel card or known debug dumps. */
+    private val PIXEL_EXACT = setOf(
+        "ac_soc", "charge_limit", "charge_deadline", "charge_stage", "charge_to_limit", "charging_speed",
+        "charging_state", "charging_policy", "charger_state", "chg_profile_switch", "charge_full_estimate",
+        "ssoc_details", "cycle_counts", "swelling_data", "csi_stats", "charge_details", "charge_stats_actual",
+        "ttf_stats", "ttf_details", "dev_sn", "pairing_state", "sr_state", "temp_filter_enable",
+        "force_fcr_update_ops", "full_cap_rep", "act_impedance", "fg_learning_events", "gmsr",
+        "registers_dump", "rc_switch_enable", "resistance_id",
+    )
+    private val PIXEL_PREFIXES = listOf(
+        "aafv_", "aacr_", "aacc_", "aacp_", "aact_", "aacv_", "bd_trickle_", "health_", "capacity_level_",
+        "power_metrics_", "bypass_chargelimit_",
+    )
+
     fun isKnown(name: String): Boolean =
-        name in STANDARD || name in INTERPRETED || name.startsWith("hwmon") || name.startsWith("wakeup")
+        name in STANDARD || name in INTERPRETED || name in PIXEL_EXACT ||
+            name.startsWith("hwmon") || name.startsWith("wakeup") ||
+            PIXEL_PREFIXES.any { name.startsWith(it) }
 
     fun unknownNodes(shell: ShellData): List<UnknownNode> =
         shell.sysfsFull.flatMap { (supply, values) ->
