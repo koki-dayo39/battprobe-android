@@ -43,6 +43,7 @@ object ChargeNotification {
             setSound(null, null)
             enableVibration(false)
             setShowBadge(false)
+            lockscreenVisibility = Notification.VISIBILITY_PUBLIC
         }
         manager.createNotificationChannel(channel)
     }
@@ -68,6 +69,8 @@ object ChargeNotification {
             .setOngoing(true)
             .setSilent(true)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
+            // Battery stats are not private; show the full content on the lock screen.
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .build()
     }

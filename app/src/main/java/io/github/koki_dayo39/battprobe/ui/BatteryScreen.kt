@@ -565,7 +565,12 @@ private fun PixelCard(info: PixelInfo) {
                     onOff(it) + (info.defenderRechargeSoc?.let { soc -> " · $soc %" } ?: ""),
                 )
             }
-            info.adaptiveTargetSoc?.let { KeyValueRow(stringResource(R.string.label_adaptive_target), "$it %") }
+            info.adaptiveTargetSoc?.let { soc ->
+                KeyValueRow(
+                    stringResource(R.string.label_adaptive_target),
+                    info.timeToAdaptiveTargetSec?.let { stringResource(R.string.value_soc_eta, soc, formatDuration(it * 1000)) } ?: "$soc %",
+                )
+            }
             KeyValueRow(stringResource(R.string.label_charge_limit), info.chargeLimit?.let { "$it %" } ?: stringResource(R.string.value_none))
             info.chargeDeadlineSec?.let { KeyValueRow(stringResource(R.string.label_charge_deadline), formatDuration(it * 1000)) }
             info.chargeStage?.let { KeyValueRow(stringResource(R.string.label_charge_stage), it) }
