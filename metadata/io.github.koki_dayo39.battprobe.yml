@@ -4,13 +4,13 @@ Categories:
   - System
 License: GPL-3.0-or-later
 AuthorName: koki-dayo39
-SourceCode: https://github.com/koki-dayo39/batterystatus-android
-IssueTracker: https://github.com/koki-dayo39/batterystatus-android/issues
+SourceCode: https://github.com/koki-dayo39/battprobe-android
+IssueTracker: https://github.com/koki-dayo39/battprobe-android/issues
 
 AutoName: BattProbe
 
 RepoType: git
-Repo: https://github.com/koki-dayo39/batterystatus-android.git
+Repo: https://github.com/koki-dayo39/battprobe-android.git
 
 Builds:
   - versionName: 1.0.0
