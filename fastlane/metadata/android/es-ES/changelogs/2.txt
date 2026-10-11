@@ -1,0 +1,2 @@
+• Pixel: muestra el tiempo restante hasta el objetivo de la carga adaptativa
+• La notificación de carga ahora muestra todo su contenido en la pantalla de bloqueo

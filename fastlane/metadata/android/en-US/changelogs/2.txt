@@ -1,0 +1,2 @@
+• Pixel: shows the time left until the adaptive charging target
+• The charging notification now shows its full content on the lock screen
