@@ -47,6 +47,8 @@ object KnownSysfs {
         "ttf_stats", "ttf_details", "dev_sn", "pairing_state", "sr_state", "temp_filter_enable",
         "force_fcr_update_ops", "full_cap_rep", "act_impedance", "fg_learning_events", "gmsr",
         "registers_dump", "rc_switch_enable", "resistance_id",
+        // bare feature names (the prefixed variants are covered by PIXEL_PREFIXES)
+        "aacc", "aacr", "aafv", "aacp", "aact", "aacv",
     )
     private val PIXEL_PREFIXES = listOf(
         "aafv_", "aacr_", "aacc_", "aacp_", "aact_", "aacv_", "bd_trickle_", "health_", "capacity_level_",

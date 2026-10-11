@@ -245,9 +245,9 @@ class BatteryRepository(private val context: Context) {
     private companion object {
         const val BATTERY_STATS_COMMAND =
             "dumpsys batterystats 2>&1 | grep -E -m 20 " +
-                "'battery capacity|Time on battery|Discharge: |Screen on discharge|" +
-                "Screen off discharge|Screen doze discharge|Start clock time|Amount discharged|" +
-                "^Error|[Pp]ermission|denied|not found|Can.t find'"
+                "'^ *(Estimated|Last learned|Min learned|Max learned) battery capacity|" +
+                "^ *Time on battery|^ *Discharge: |^ *Screen (on|off|doze) discharge|^ *Start clock time|" +
+                "^(Error|Permission Denial|Can.t find service)'"
     }
 }
 

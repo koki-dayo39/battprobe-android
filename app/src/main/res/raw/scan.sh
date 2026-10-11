@@ -15,7 +15,7 @@ for d in /sys/class/power_supply/*/; do
       [ "$b" = "uevent" ] && continue
       if [ "$FAST" = "1" ]; then
         v=""
-        { IFS= read -r -t 1 l1 && v="$l1"; IFS= read -r -t 1 l2 && v="$v $l2"; IFS= read -r -t 1 l3 && v="$v $l3"; } <"$f" 2>/dev/null
+        { IFS= read -r -t 1 l1 && v="$l1"; IFS= read -r -t 1 l2 && v="$v $l2"; IFS= read -r -t 1 l3 && v="$v $l3"; } 2>/dev/null <"$f"
       else
         v=$(head -c 200 "$f" 2>/dev/null | tr '\n' ' ')
       fi
